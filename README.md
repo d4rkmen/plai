@@ -2,7 +2,7 @@
 
 **A standalone Meshtastic communicator for M5Stack CardPuter**
 
-> *Plai* is the Ukrainian word for a mountain trail — a reliable path for your data to travel when you're off the beaten track.
+> _Plai_ is the Ukrainian word for a mountain trail — a reliable path for your data to travel when you're off the beaten track.
 
 <p align="center">
   <img src="pics/nodes_list.png" width="480" alt="Plai Node List">
@@ -32,10 +32,12 @@ Full node management with up to 1000 nodes persisted on SD card.
 </p>
 
 - Node list with signal strength, hops, battery, role, encryption indicators
-- 8 sorting modes (name, role, signal, hops, last heard, favorites, etc.)
-- Relay node display — see which node relayed each packet
-- Favorite marking and quick-jump navigation
-- Node detail view with hardware model, position, and metrics
+- 8 sorting modes (name, role, signal, hops, last heard, favorites, etc.) _hotkey_ for sorting [1..8], [TAB] to select sorting mode
+- Relay node display — see which node relayed each packet _hotkey_ [R] to jump to relay node
+- Favorite marking and quick-jump navigation _hotkey_ [F] to toggle favorite
+- Node detail view with hardware model, position, and metrics _hotkey_ [Fn] + [ENTER] to open
+- Direct Messages _hotkey_ [ENTER] to open
+- Traceroute _hotkey_ [T] to open recent traceroute logs. [Fn] + [T] to start traceroute immediately
 
 #### Direct Messages
 
@@ -47,6 +49,8 @@ Full node management with up to 1000 nodes persisted on SD card.
 - Direct messaging with delivery status (pending → sent → ACK → delivered → failed)
 - Full keyboard input with Cyrillic layout support
 - File-backed message history on SD card
+- Clear chat _hotkey_ [BACKSPACE] to clear all messages
+- Hold [CTRL] to display message info (timestamp, will be more soon...)
 
 #### Traceroute
 
@@ -58,6 +62,7 @@ Full node management with up to 1000 nodes persisted on SD card.
 - Traceroute with hop-by-hop detail, round-trip duration, and SNR at each hop
 - Last 50 traceroute attempts stored per node
 - Visual route map with color-coded signal quality
+- Press [T] to start new traceroute
 
 ### Channels
 
@@ -72,8 +77,9 @@ Multi-channel group chat supporting up to 8 channels.
 </p>
 
 - Channel list with unread message counts
-- Channel chat with message timestamps
-- Channel creation, editing (name, PSK, uplink/downlink)
+- Channel creation _hotkey_ [Fn] + [SPACE] to open channel creation dialog
+- Channel editing _hotkey_ [Fn] + [ENTER] to open channel editing dialog
+- Channel chat _hotkey_ [ENTER] to open channel chat
 - Individual notification sounds per channel
 
 ### Monitor
@@ -112,24 +118,24 @@ Complete device and mesh configuration.
 
 ### Required
 
-| Component | Description |
-|-----------|-------------|
+| Component                 | Description                              |
+| ------------------------- | ---------------------------------------- |
 | **M5Stack CardPuter ADV** | ESP32-S3 portable terminal with keyboard |
-| **LoRa CAP** | M5Stack SX1262 LoRa module (868/915 MHz) |
-| **SD Card** | For profile, messages, and node database |
+| **LoRa CAP**              | M5Stack SX1262 LoRa module (868/915 MHz) |
+| **SD Card**               | For profile, messages, and node database |
 
 ### Optional
 
-| Component | Description |
-|-----------|-------------|
-| **GPS** | ATGM336H module (UART, 115200 baud) for live position sharing |
+| Component | Description                                                   |
+| --------- | ------------------------------------------------------------- |
+| **GPS**   | ATGM336H module (UART, 115200 baud) for live position sharing |
 
 ### Also Supported
 
-| Board | Keyboard | Status |
-|-------|----------|--------|
-| M5Cardputer (original) | IOMatrix | Supported |
-| M5Cardputer ADV | TCA8418 (I2C) | Supported |
+| Board                  | Keyboard      | Status    |
+| ---------------------- | ------------- | --------- |
+| M5Cardputer (original) | IOMatrix      | Supported |
+| M5Cardputer ADV        | TCA8418 (I2C) | Supported |
 
 Keyboard driver is auto-detected at boot.
 
@@ -178,21 +184,21 @@ idf.py menuconfig
 # Navigate to: HAL Configuration
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `HAL_USE_DISPLAY` | on | ST7789 display via LovyanGFX |
-| `HAL_USE_KEYBOARD` | on | Keyboard input (requires I2C) |
-| `HAL_USE_RADIO` | on | SX1262 LoRa radio |
-| `HAL_USE_SDCARD` | on | SD card (FAT) |
-| `HAL_USE_GPS` | on | ATGM336H GPS |
-| `HAL_USE_SPEAKER` | on | I2S audio output |
-| `HAL_USE_LED` | on | WS2812 RGB LED |
-| `HAL_USE_BAT` | on | Battery voltage monitor |
-| `HAL_USE_I2C` | on | I2C master bus |
-| `HAL_USE_BUTTON` | on | Home button |
-| `HAL_USE_USB` | on | USB MSC host |
-| `HAL_USE_WIFI` | on | WiFi |
-| `HAL_USE_BLE` | on | Bluetooth Low Energy |
+| Option             | Default | Description                   |
+| ------------------ | ------- | ----------------------------- |
+| `HAL_USE_DISPLAY`  | on      | ST7789 display via LovyanGFX  |
+| `HAL_USE_KEYBOARD` | on      | Keyboard input (requires I2C) |
+| `HAL_USE_RADIO`    | on      | SX1262 LoRa radio             |
+| `HAL_USE_SDCARD`   | on      | SD card (FAT)                 |
+| `HAL_USE_GPS`      | on      | ATGM336H GPS                  |
+| `HAL_USE_SPEAKER`  | on      | I2S audio output              |
+| `HAL_USE_LED`      | on      | WS2812 RGB LED                |
+| `HAL_USE_BAT`      | on      | Battery voltage monitor       |
+| `HAL_USE_I2C`      | on      | I2C master bus                |
+| `HAL_USE_BUTTON`   | on      | Home button                   |
+| `HAL_USE_USB`      | on      | USB MSC host                  |
+| `HAL_USE_WIFI`     | on      | WiFi                          |
+| `HAL_USE_BLE`      | on      | Bluetooth Low Energy          |
 
 ## Project Structure
 
