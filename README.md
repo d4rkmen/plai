@@ -124,21 +124,6 @@ Complete device and mesh configuration.
 | **LoRa CAP**              | M5Stack SX1262 LoRa module (868/915 MHz) |
 | **SD Card**               | For profile, messages, and node database |
 
-### Optional
-
-| Component | Description                                                   |
-| --------- | ------------------------------------------------------------- |
-| **GPS**   | ATGM336H module (UART, 115200 baud) for live position sharing |
-
-### Also Supported
-
-| Board                  | Keyboard      | Status    |
-| ---------------------- | ------------- | --------- |
-| M5Cardputer (original) | IOMatrix      | Supported |
-| M5Cardputer ADV        | TCA8418 (I2C) | Supported |
-
-Keyboard driver is auto-detected at boot.
-
 ## Install
 
 Beta version is available in **M5Apps** (Installer → Cloud → Beta tests).
