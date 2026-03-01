@@ -19,6 +19,8 @@ Most Meshtastic nodes rely on a phone via BLE or WiFi. Plai takes a different ap
 - **Debug tools** — Built-in Packet Monitor (last 50 packets) and Trace Route history (last 50 attempts per node).
 - **Custom alerts** — Individual channel notifications with distinct sounds.
 - **Fully compatible** with Meshtastic network v2.7+
+- **Ping auto-reply**: respond automatically when someone #ping's the channel
+- **New node greetings**: send a welcome broadcast to the channel and/or a Direct Message when a new node appears
 
 ## Apps
 
@@ -27,8 +29,8 @@ Most Meshtastic nodes rely on a phone via BLE or WiFi. Plai takes a different ap
 Full node management with up to 1000 nodes persisted on SD card.
 
 <p align="center">
-  <img src="pics/nodes_list.png" width="480" alt="Node List">
   <img src="pics/nodes.png" width="480" alt="Node Detail">
+  <img src="pics/nodes_list.png" width="480" alt="Node List">
 </p>
 
 - Node list with signal strength, hops, battery, role, encryption indicators
@@ -69,8 +71,8 @@ Full node management with up to 1000 nodes persisted on SD card.
 Multi-channel group chat supporting up to 8 channels.
 
 <p align="center">
-  <img src="pics/channels_list.png" width="480" alt="Channel List">
   <img src="pics/channels.png" width="480" alt="Channel Chat">
+  <img src="pics/channels_list.png" width="480" alt="Channel List">
 </p>
 <p align="center">
   <img src="pics/channel_chat_info.png" width="480" alt="Channel Chat Info">
@@ -82,13 +84,23 @@ Multi-channel group chat supporting up to 8 channels.
 - Channel chat _hotkey_ [ENTER] to open channel chat
 - Individual notification sounds per channel
 
+#### New node greetings & #ping auto-reply
+
+Many of us send "test test" and get no reply. Now Plai can reply automatically when you add **#ping** in your channel message — no more wondering if anyone's listening.
+
+- **#ping auto-reply** — Add `#ping` anywhere in a channel message; Plai responds with a configurable template. Macros: `#short`, `#long`, `#id`, `#hops`, `#snr`, `#rssi`
+- **New node greetings** — When a node appears for the first time (after receiving their NodeInfo), Plai can send a welcome broadcast to the channel and/or a Direct Message. Same macros apply.
+- **Per-channel settings** — Each of the 8 channels has its own greeting and ping reply templates.
+
+Example: _"Look who is here! #long, welcome to HAM Community of Smartwill city. I can see you with #hops hops #snr/#rssi"_
+
 ### Monitor
 
 Live radio packet feed for debugging and network analysis.
 
 <p align="center">
-  <img src="pics/monitor_list.png" width="480" alt="Packet List">
   <img src="pics/monitor.png" width="480" alt="Packet Detail">
+  <img src="pics/monitor_list.png" width="480" alt="Packet List">
 </p>
 
 - Real-time TX/RX packet display with port labels (TEXT, POS, NODE, TELE, ROUT, TRAC, etc.)
