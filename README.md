@@ -49,6 +49,7 @@ Full node management with up to 1000 nodes persisted on SD card.
 </p>
 
 - Direct messaging with delivery status (pending → sent → ACK → delivered → failed)
+- Channel invitation _hotkey_ [I] — invite the node to a channel (sends `#invite name=key` DM)
 - Full keyboard input with Cyrillic layout support
 - File-backed message history on SD card
 - Clear chat _hotkey_ [BACKSPACE] to clear all messages
@@ -92,7 +93,17 @@ Many of us send "test test" and get no reply. Now Plai can reply automatically w
 - **New node greetings** — When a node appears for the first time (after receiving their NodeInfo), Plai can send a welcome broadcast to the channel and/or a Direct Message. Same macros apply.
 - **Per-channel settings** — Each of the 8 channels has its own greeting and ping reply templates.
 
+There are predefined templates for the greetings and ping reply. You can use them or enter your own custom text, holding [Fn] key.
+
 Example: _"Look who is here! #long, welcome to HAM Community of Smartwill city. I can see you with #hops hops #snr/#rssi"_
+
+#### Channel invitation
+
+Share a channel with another node via Direct Message.
+
+- **Sending** — In DM with a node, press [I]. Select a channel; Plai sends a DM in format `#invite name=base64_psk` (name max 11 chars, key base64-encoded). If the node has no public key, a confirmation is shown before sending unencrypted.
+- **Receiving** — Enable **Settings → Security → Invitations**. When a DM starts with `#invite ` and matches `#invite channel_name=base64_psk`, Plai creates a new channel at the first free slot. Duplicate channels (same name and key) are ignored.
+- Requires at least one free channel slot to accept an invitation.
 
 ### Monitor
 
@@ -105,13 +116,21 @@ Live radio packet feed for debugging and network analysis.
 
 - Real-time TX/RX packet display with port labels (TEXT, POS, NODE, TELE, ROUT, TRAC, etc.)
 - Color-coded direction, node badges, and SNR indicators
+- Color-coded packet ID for easy relay identification
 - From/To node name resolution from NodeDB
 - Scrollable packet list with detail drill-down view
-- Last 50 packets in a zero-heap ring buffer
+- Last 50 packets in a static ring buffer
+- Select first item for autoscroll
 
 ### Settings
 
-Complete device and mesh configuration.
+Complete device and mesh configuration stores in NVS. You can export and import settings to SD card for backup and restore it later.
+
+<p align="center">
+  <b><span style="color:red;">&#x26A0;️</span> <span style="color:red;">Mesh keys are in NVS. Don't forget to backup them to SD card if you want to keep them after firmware update!</span></b>
+</p>
+
+Node database and chat history are stored on SD card and not affected by firmware updates.
 
 <p align="center">
   <img src="pics/settings.png" width="480" alt="Settings">
@@ -119,7 +138,7 @@ Complete device and mesh configuration.
 
 - System: brightness, volume, timezone
 - LoRa: region, modem preset, TX power, hop limit
-- Security: channel PSK management
+- Security: channel PSK management, invitations (auto-add channels from `#invite` DMs)
 - Node info: name, short name, role
 - Position: GPS enable, fixed position, broadcast interval
 - Telemetry: device metrics broadcast
