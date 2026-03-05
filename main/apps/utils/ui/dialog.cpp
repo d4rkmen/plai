@@ -969,7 +969,7 @@ namespace UTILS
                                     break;
 
                                 hal->playNextSound();
-                                if (utf8_strlen(input) < (size_t)max_length)
+                                if (input.size() < (size_t)max_length)
                                 {
                                     size_t byte_off = utf8_byte_offset(input, cursor_pos);
                                     input.insert(byte_off, chars[i]);
