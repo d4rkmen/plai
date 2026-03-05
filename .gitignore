@@ -1,0 +1,9 @@
+.vscode
+.cache
+build
+managed_components
+docs
+archive
+main/meshtastic/*
+tools
+protobufs

@@ -1,0 +1,55 @@
+# Plai NVS file
+key,type,encoding,value
+system,namespace,,
+brightness,data,i32,255
+volume,data,i32,100
+dim_time,data,i32,30
+boot_sound,data,u8,1
+show_bat_volt,data,u8,1
+show_time,data,u8,1
+timezone,data,string,"GMT+2"
+# lora
+lora,namespace,,
+region,data,string,"UA_433"
+modem_preset,data,string,"LongFast"
+hop_limit,data,i32,5
+freq_slot,data,i32,1
+freq_ovr,data,i32,0
+duty_ovr,data,u8,1
+rx_boost,data,u8,1
+tx_power,data,i32,22
+# security
+security,namespace,,
+public_key,data,string,""
+private_key,data,string,""
+invitations,data,u8,1
+# nodeinfo
+nodeinfo,namespace,,
+long_name,data,string,""
+short_name,data,string,""
+unmessagable,data,u8,0
+ham_licensed,data,u8,0
+role,data,string,"Client"
+rebroadcast,data,string,"All"
+bcast_int,data,string,"1h"
+# position
+position,namespace,,
+location,data,string,"off"
+latitude,data,i32,0
+longitude,data,i32,0
+altitude,data,i32,0
+pos_alt,data,u8,1
+pos_sats,data,u8,1
+pos_seq,data,u8,0
+pos_time,data,u8,1
+pos_heading,data,u8,0
+pos_speed,data,u8,0
+bcast_int,data,string,"1h"
+# devmetrics
+devmetrics,namespace,,
+bat_level,data,u8,1
+voltage,data,u8,1
+ch_util,data,u8,1
+air_util,data,u8,1
+uptime,data,u8,1
+bcast_int,data,string,"1h"
