@@ -50,6 +50,7 @@ namespace MOONCAKE::APPS
             // Detail state
             Mesh::PacketLogEntry detail_pkt;
             int detail_scroll;
+            int detail_scroll_max;
 
             // Animation
             UTILS::HL_TEXT::HLTextContext_t hint_hl_ctx;

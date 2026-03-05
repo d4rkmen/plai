@@ -26,7 +26,7 @@ static const char* TAG = "APP_MONITOR";
 #define COL_SHORT_NAME_WIDTH (4 * 6 + 6)
 
 static const char* HINT_LIST = "[\u2191][\u2193][\u2190][\u2192] [ENTER] [ESC]";
-static const char* HINT_DETAIL = "[\u2191][\u2193] [ESC]";
+static const char* HINT_DETAIL = "[\u2191][\u2193][\u2190][\u2192] [ESC]";
 
 using namespace MOONCAKE::APPS;
 
@@ -45,6 +45,7 @@ void AppMonitor::onCreate()
     _data.focused_at_bottom = false;
     _data.update_list = true;
     _data.detail_scroll = 0;
+    _data.detail_scroll_max = 0;
 
     hl_text_init(&_data.hint_hl_ctx, _data.hal->canvas(), 20, 1500);
 }
@@ -206,23 +207,6 @@ bool AppMonitor::_render_packet_list()
     canvas->fillScreen(THEME_COLOR_BG);
     canvas->setFont(FONT_12);
 
-#if 0
-    // Header
-    canvas->setTextColor(TFT_ORANGE, THEME_COLOR_BG);
-    canvas->drawString("<", 2, 0);
-    canvas->drawString("Monitor", 14, 0);
-
-
-    // Show count badge
-    {
-        char cnt[8];
-        snprintf(cnt, sizeof(cnt), "%d", total);
-        canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
-        canvas->drawRightString(cnt, canvas->width() - 2, 0);
-    }
-
-    canvas->drawFastHLine(0, 14, canvas->width(), THEME_COLOR_BG_SELECTED);
-#endif
     auto& log = Mesh::MeshDataStore::getInstance().getPacketLog();
     auto* nodedb = _data.hal->nodedb();
     int total = (int)log.size();
@@ -588,6 +572,7 @@ bool AppMonitor::_render_packet_detail()
     const int max_visible = (canvas->height() - y_start - 9) / (row_height + 1);
 
     int max_scroll = std::max(0, row_count - max_visible);
+    _data.detail_scroll_max = max_scroll;
     if (_data.detail_scroll > max_scroll)
         _data.detail_scroll = max_scroll;
     if (_data.detail_scroll < 0)
@@ -742,7 +727,7 @@ void AppMonitor::_handle_detail_input()
         }
         else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_DOWN))
         {
-            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.detail_scroll < 12)
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.detail_scroll < _data.detail_scroll_max)
             {
                 _data.detail_scroll++;
                 _data.hal->playNextSound();
@@ -754,6 +739,26 @@ void AppMonitor::_handle_detail_input()
             if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.detail_scroll > 0)
             {
                 _data.detail_scroll--;
+                _data.hal->playNextSound();
+                _data.update_list = true;
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_RIGHT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.detail_scroll < _data.detail_scroll_max)
+            {
+                const int page = ((_data.hal->canvas()->height() - 15 - 9) / 15);
+                _data.detail_scroll = std::min(_data.detail_scroll + page, _data.detail_scroll_max);
+                _data.hal->playNextSound();
+                _data.update_list = true;
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_LEFT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.detail_scroll > 0)
+            {
+                const int page = ((_data.hal->canvas()->height() - 15 - 9) / 15);
+                _data.detail_scroll = std::max(_data.detail_scroll - page, 0);
                 _data.hal->playNextSound();
                 _data.update_list = true;
             }
