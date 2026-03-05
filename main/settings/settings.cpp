@@ -1033,6 +1033,14 @@ namespace SETTINGS
         if (success)
         {
             ESP_LOGI(TAG, "Settings successfully imported from %s", filename.c_str());
+            // Re-apply LoRa / mesh config so the radio immediately uses the imported values
+            if (_hal && _hal->mesh())
+            {
+                Mesh::MeshConfig cfg = _hal->mesh()->getConfig();
+                _hal->mesh()->loadConfigFromSettings(cfg);
+                _hal->mesh()->setConfig(cfg);
+                ESP_LOGI(TAG, "Mesh/LoRa config re-applied after import");
+            }
         }
         else
         {
