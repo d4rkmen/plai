@@ -449,7 +449,8 @@ namespace Mesh
           _gps(nullptr), _nodedb(nullptr), _router(), _config(), _state(MeshState::UNINITIALIZED), _message_callback(nullptr),
           _connection_callback(nullptr), _battery_callback(nullptr), _fromradio_state(FromRadioState::IDLE),
           _fromradio_config_id(0), _fromradio_node_index(0), _fromradio_channel_index(0), _last_nodeinfo_broadcast_ms(0),
-          _last_position_broadcast_ms(0), _last_telemetry_broadcast_ms(0), _tx_in_progress(false), _last_tx_start_ms(0),
+          _force_nodeinfo_broadcast(false), _last_position_broadcast_ms(0), _last_telemetry_broadcast_ms(0),
+          _tx_in_progress(false), _last_tx_start_ms(0),
           _last_rx_rssi(0), _last_rx_snr(0.0f), _airtime_window_start_ms(0), _airtime_tx_ms(0), _airtime_rx_ms(0),
           _airtime_tx_ms_prev(0), _airtime_rx_ms_prev(0)
     {
@@ -658,12 +659,14 @@ namespace Mesh
             }
         }
 
-        // Periodic node info broadcast (every 60 seconds)
-        if (_config.nodeinfo_broadcast_interval_ms > 0 &&
-            now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms)
+        // Periodic node info broadcast; also fires immediately when forced by a settings change
+        if (_force_nodeinfo_broadcast ||
+            (_config.nodeinfo_broadcast_interval_ms > 0 &&
+             now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms))
         {
             broadcastNodeInfo();
             _last_nodeinfo_broadcast_ms = now;
+            _force_nodeinfo_broadcast = false;
         }
 
         // Periodic position broadcast (every 15 minutes)
@@ -3367,6 +3370,13 @@ namespace Mesh
             return;
         }
         sendNodeInfo(0xFFFFFFFF, 0, false);
+    }
+
+    void MeshService::forceNodeInfoBroadcast()
+    {
+        ESP_LOGI(TAG, "Forcing node info broadcast on next update cycle");
+        _force_nodeinfo_broadcast = true;
+        _last_nodeinfo_broadcast_ms = 0;
     }
 
     void MeshService::sendNodeInfo(uint32_t dest, uint8_t channel, bool want_response)

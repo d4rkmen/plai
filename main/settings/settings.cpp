@@ -55,6 +55,12 @@ namespace SETTINGS
         };
 
         auto mesh_apply_cb = [this](SettingItem_t& item) { applyMeshConfig(item); };
+        auto nodeinfo_apply_cb = [this](SettingItem_t& item)
+        {
+            applyMeshConfig(item);
+            if (_hal && _hal->mesh())
+                _hal->mesh()->forceNodeInfoBroadcast();
+        };
         // LoRa settings
         SettingGroup_t lora_group;
         lora_group.name = "LoRa config";
@@ -170,11 +176,15 @@ namespace SETTINGS
                      b64_len = 0;
                      if (mbedtls_base64_encode(b64, sizeof(b64), &b64_len, pub_key, 32) == 0)
                          setString("security", "public_key", std::string((char*)b64, b64_len));
+                     // apply the changes to the mesh
+                     applyMeshConfig(item);
                  }
-                 if (_hal)
+                 else
                  {
-                     if (!ok)
+                     if (_hal)
+                     {
                          UTILS::UI::show_error_dialog(_hal, "Error", "Key generation failed", "OK");
+                     }
                  }
              }},
             {"invitations",
@@ -214,7 +224,7 @@ namespace SETTINGS
         nodeinfo_group.nvs_namespace = "nodeinfo";
         nodeinfo_group.items = {
             back_item,
-            {"long_name", "Long name", TYPE_STRING, "", "", "", "40", "Long name for this node", mesh_apply_cb},
+            {"long_name", "Long name", TYPE_STRING, "", "", "", "40", "Long name for this node", nodeinfo_apply_cb},
             {"short_name",
              "Short name",
              TYPE_STRING,
@@ -223,7 +233,7 @@ namespace SETTINGS
              "",
              "4",
              "Short name for this node (max 4 characters)",
-             mesh_apply_cb},
+             nodeinfo_apply_cb},
             {"unmessagable",
              "Unmessagable",
              TYPE_BOOL,
@@ -232,8 +242,16 @@ namespace SETTINGS
              "",
              "",
              "Node does not accept messages",
-             mesh_apply_cb},
-            {"ham_licensed", "HAM licensed", TYPE_BOOL, "false", "false", "", "", "HAM radio licensed operator", mesh_apply_cb},
+             nodeinfo_apply_cb},
+            {"ham_licensed",
+             "HAM licensed",
+             TYPE_BOOL,
+             "false",
+             "false",
+             "",
+             "",
+             "HAM radio licensed operator",
+             nodeinfo_apply_cb},
             {"role",
              "Role",
              TYPE_STRING,
@@ -242,7 +260,7 @@ namespace SETTINGS
              "Client;Client Mute;Client Hidden;Tracker;Lost+Found;Sensor;TAK;TAK Tracker;Repeater;Router",
              "",
              "Device role (affects routing behavior)",
-             mesh_apply_cb},
+             nodeinfo_apply_cb},
             {"rebroadcast",
              "Rebroadcast",
              TYPE_STRING,
@@ -251,7 +269,7 @@ namespace SETTINGS
              "All;All skip decode;Local only;Known only;None",
              "",
              "Rebroadcast mode for received packets",
-             mesh_apply_cb},
+             nodeinfo_apply_cb},
             {"bcast_int",
              "Broadcast interval",
              TYPE_STRING,
@@ -260,7 +278,7 @@ namespace SETTINGS
              "off;15m;30m;1h;2h;4h;8h;12h;24h",
              "",
              "Node info broadcast interval",
-             mesh_apply_cb},
+             nodeinfo_apply_cb},
         };
 
         // Position info settings
@@ -1039,6 +1057,8 @@ namespace SETTINGS
                 Mesh::MeshConfig cfg = _hal->mesh()->getConfig();
                 _hal->mesh()->loadConfigFromSettings(cfg);
                 _hal->mesh()->setConfig(cfg);
+                // force node info broadcast
+                _hal->mesh()->forceNodeInfoBroadcast();
                 ESP_LOGI(TAG, "Mesh/LoRa config re-applied after import");
             }
         }

@@ -306,6 +306,12 @@ namespace Mesh
          */
         void loadConfigFromSettings(MeshConfig& config);
 
+        /**
+         * @brief Force an immediate node info broadcast on the next update() cycle
+         * Resets the broadcast timer so the interval check fires immediately
+         */
+        void forceNodeInfoBroadcast();
+
     private:
         HAL::Hal* _hal;
         // BLE callbacks
@@ -390,6 +396,7 @@ namespace Mesh
 
         // Periodic node info broadcast
         uint32_t _last_nodeinfo_broadcast_ms;
+        bool _force_nodeinfo_broadcast;
 
         // Periodic position broadcast
         uint32_t _last_position_broadcast_ms;
