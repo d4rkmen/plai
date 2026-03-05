@@ -1,0 +1,7 @@
+.pio
+sdkconfig*
+!sdkconfig.defaults
+build
+.vs
+.DS_Store
+.directory

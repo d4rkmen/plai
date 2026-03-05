@@ -1,0 +1,142 @@
+# SDLBuild.yml
+name: SDLBuild
+
+env:
+  PROJECT_DIR: examples_for_PC/CMake_SDL
+  WASM_DIR: examples_for_PC/CMake_WASM
+
+
+on:
+  push:
+    paths:
+    - '**.ino'
+    - '**.cpp'
+    - '**.hpp'
+    - '**.h'
+    - '**.c'
+    - '**SDLBuild.yml'
+    - '**SDL.cmake'
+    - '**installSDL2.bat'
+  pull_request:
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+
+  LGFX_SDL2:
+
+    name: LGFX_SDL2 (${{ matrix.os }})
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: windows-latest }
+          - { os: macos-latest   }
+          - { os: ubuntu-latest  }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Cache SDL2 for Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        uses: actions/cache@v4
+        id: cache-SLD2-windows
+        with:
+          path: contrib
+          key: ${{ runner.os }}-${{ hashFiles('.github/scripts/installSDL2.bat') }}
+
+      - name: Build SDL2 for Windows
+        if: matrix.os == 'windows-latest' && steps.cache-SLD2-windows.outputs.cache-hit != 'true'
+        run: |
+          .github/scripts/installSDL2.bat
+
+      - name: Build LGFX_SDL2 for Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        env:
+          CC: clang
+          CXX: clang++
+          SDL2_DIR: D:/a/LovyanGFX/LovyanGFX/contrib/src/SDL2-2.0.22/install
+        run: |
+          cp .github/scripts/SDL.cmake ${{ env.PROJECT_DIR }}/CMakeLists.txt
+          cd ${{ env.PROJECT_DIR }}
+          cmake -S . -B build/debug -G "Visual Studio 17 2022" -A x64 -T ClangCL -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=${{ env.SDL2_DIR }}
+          cmake --build build/debug --config Debug
+          cmake -S . -B build/release -G "Visual Studio 17 2022" -A x64 -T ClangCL -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ env.SDL2_DIR }}
+          cmake --build build/release --config Release
+
+
+      - name: Build LGFX_SDL2 for Linux
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt update
+          sudo apt-get install libsdl2-dev
+          cp .github/scripts/SDL.cmake ${{ env.PROJECT_DIR }}/CMakeLists.txt
+          cd ${{ env.PROJECT_DIR }}
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build .
+
+      - name: Build LGFX_SDL2/WASM for Linux
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install latest # any specific version?
+          ./emsdk activate latest
+          source ./emsdk_env.sh
+          cd ..
+          cd ${{env.WASM_DIR}}
+          mkdir build
+          cd build
+          emcmake cmake ..
+          emmake make
+          mkdir -p www/WASM
+          cp index.html www/WASM/index.html
+
+      - name: Upload WASM artifact
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{env.WASM_DIR}}/build/www
+
+
+      - name: Build LGFX_SDL2 for Mac
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install sdl2
+          cp .github/scripts/SDL.cmake ${{ env.PROJECT_DIR }}/CMakeLists.txt
+          cd ${{ env.PROJECT_DIR }}
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build .
+
+
+  deploy:
+    name: Deploy WASM Example 🚀
+    if: github.ref == 'refs/heads/master'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: LGFX_SDL2
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2

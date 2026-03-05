@@ -1,0 +1,106 @@
+name: PlatformIOBuild
+
+env:
+  PROJECT_DIR: examples/Test/build_test
+
+on:
+  push:
+    paths:
+    - '**.ino'
+    - '**.cpp'
+    - '**.hpp'
+    - '**.h'
+    - '**.c'
+    - '**PlatformioBuild.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.board }}@${{ matrix.platform-version }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+
+        board:
+          - esp32
+          - esp32-s2
+          - esp32-s3
+          - esp32-c3
+          - m5stick-c
+          - m5stack-core-esp32
+          - m5stack-core2
+          - m5stack-cores3
+
+        platform-version:
+          - 1.0.6
+          - 2.0.11
+          - 2.0.12
+          - 2.0.13
+          - default
+
+        exclude:
+          - { board: esp32-c3, platform-version: 1.0.6 }
+          - { board: esp32-s3, platform-version: 1.0.6 }
+          - { board: esp32-s3, platform-version: default }
+          - { board: esp32-s2, platform-version: 1.0.6 }
+          - { board: m5stack-cores3, platform-version: 1.0.6 }
+
+        include:
+          - board: esp32
+          - board: esp32-s2
+          - board: esp32-s3
+          - board: esp32-c3
+          - board: m5stick-c
+          - board: m5stack-core-esp32
+          - board: m5stack-core2
+          - board: m5stack-cores3
+          - { board: esp8266, platform-version: 4.2.1, ... }
+          - { board: esp8266, platform-version: 4.2.0, ... }
+          - { board: esp8266, platform-version: 4.1.0, ... }
+          - { board: seeed_wio_terminal, platform-version: default, ... }
+          - { board: adafruit_pybadge_m4, platform-version: default, ... }
+          - { board: pico, platform-version: default, ... }
+          - { board: native, platform-version: portduino, ... }
+
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade platformio
+
+      - name: Run PlatformIO
+
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          export pio_ver=${{ matrix.platform-version }}
+          export pio_env="${pio_ver//./_}"
+          pio pkg install -e ${{ matrix.board }}-$pio_env --no-save --library file://$(realpath ../../../)
+          [[ "$pio_env" == "portduino" ]] && { sudo apt update; sudo apt-get install libgpiod-dev libbluetooth-dev; export PLATFORMIO_SRC_DIR=portduino; }
+          pio run -e ${{ matrix.board }}-$pio_env
