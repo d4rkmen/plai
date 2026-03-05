@@ -1,0 +1,6 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf:
+    version: ">=5.5.2"
+## for HAL USB
+  usb_host_msc: "^1.1.4"

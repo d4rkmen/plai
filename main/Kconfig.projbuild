@@ -1,0 +1,56 @@
+menu "HAL Configuration"
+
+    config HAL_USE_I2C
+        bool "Enable I2C master"
+        default y
+
+    config HAL_USE_DISPLAY
+        bool "Enable display (LovyanGFX)"
+        default y
+
+    config HAL_USE_KEYBOARD
+        bool "Enable keyboard"
+        default y
+        depends on HAL_USE_I2C
+
+    config HAL_USE_SPEAKER
+        bool "Enable speaker (I2S audio)"
+        default y
+
+    config HAL_USE_LED
+        bool "Enable RGB LED (WS2812)"
+        default y
+
+    config HAL_USE_BUTTON
+        bool "Enable button input"
+        default y
+
+    config HAL_USE_BAT
+        bool "Enable battery monitoring"
+        default y
+
+    config HAL_USE_SDCARD
+        bool "Enable SD card"
+        default y
+
+    config HAL_USE_USB
+        bool "Enable USB MSC host"
+        default y
+
+    config HAL_USE_WIFI
+        bool "Enable WiFi"
+        default y
+
+    config HAL_USE_BLE
+        bool "Enable Bluetooth Low Energy"
+        default y
+
+    config HAL_USE_RADIO
+        bool "Enable LoRa radio (SX1262)"
+        default y
+
+    config HAL_USE_GPS
+        bool "Enable GPS (ATGM336H)"
+        default y
+
+endmenu
