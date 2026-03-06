@@ -125,10 +125,10 @@ namespace Mesh
             POSITION_GPS
         };
         PositionMode position = POSITION_OFF; // Position source: off, fixed coords, or live GPS
-        int32_t fixed_latitude;   // Fixed latitude (degrees * 1e7)
-        int32_t fixed_longitude; // Fixed longitude (degrees * 1e7)
-        int32_t fixed_altitude;  // Fixed altitude MSL (meters)
-        uint32_t position_flags; // Bitwise OR of meshtastic_Config_PositionConfig_PositionFlags
+        int32_t fixed_latitude;               // Fixed latitude (degrees * 1e7)
+        int32_t fixed_longitude;              // Fixed longitude (degrees * 1e7)
+        int32_t fixed_altitude;               // Fixed altitude MSL (meters)
+        uint32_t position_flags;              // Bitwise OR of meshtastic_Config_PositionConfig_PositionFlags
 
         // Broadcast intervals (milliseconds, 0 = disabled)
         uint32_t nodeinfo_broadcast_interval_ms;

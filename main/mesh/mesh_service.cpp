@@ -3385,6 +3385,7 @@ namespace Mesh
         strncpy(user.short_name, _config.short_name, sizeof(user.short_name) - 1);
         strncpy(user.long_name, _config.long_name, sizeof(user.long_name) - 1);
         user.hw_model = meshtastic_HardwareModel_M5STACK_CARDPUTER_ADV;
+        user.role = _config.role;
         // Convert node ID to hex string for id field
         snprintf(user.id, sizeof(user.id), "!%08lx", (unsigned long)_config.node_id);
         // BLE MAC addr
