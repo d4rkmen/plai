@@ -441,6 +441,7 @@ namespace Mesh
             uint8_t retries_left;               // Retries remaining (0 = final attempt)
             uint8_t raw_data[MAX_LORA_PAYLOAD]; // Raw on-air packet for retransmission
             uint8_t raw_len;                    // Length of raw_data
+            meshtastic_PortNum port_hint;       // Port number for TX log display on retries
         };
         std::map<uint32_t, PendingAck> _pending_acks; // packet_id -> PendingAck
         void checkPendingAcks();

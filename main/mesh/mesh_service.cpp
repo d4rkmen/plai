@@ -725,7 +725,7 @@ namespace Mesh
                              "ACK timeout for packet 0x%08lX, retrying (%u retries left)",
                              (unsigned long)it->first,
                              it->second.retries_left);
-                    _router.enqueueTxRaw(it->second.raw_data, it->second.raw_len, PacketPriority::RELIABLE);
+                    _router.enqueueTxRaw(it->second.raw_data, it->second.raw_len, PacketPriority::RELIABLE,it->second.port_hint);
                     ++it;
                 }
                 else
@@ -945,6 +945,7 @@ namespace Mesh
                 pa.send_time_ms = now;
                 pa.retries_left = MAX_TX_RETRIES;
                 pa.raw_len = (uint8_t)radio_len;
+                pa.port_hint = meshtastic_PortNum_TEXT_MESSAGE_APP;
                 memcpy(pa.raw_data, radio_buf, radio_len);
                 _pending_acks[packet_id] = pa;
             }
@@ -1073,6 +1074,7 @@ namespace Mesh
                 pa.send_time_ms = now;
                 pa.retries_left = MAX_TX_RETRIES;
                 pa.raw_len = (uint8_t)radio_len;
+                pa.port_hint = port_num;
                 memcpy(pa.raw_data, radio_buf, radio_len);
                 _pending_acks[packet_id] = pa;
             }
@@ -2018,6 +2020,27 @@ namespace Mesh
                          packet.relay_node);
                 MeshDataStore::getInstance().updateMessageStatus(packet.id, TextMessage::Status::ACK);
                 _pending_acks.erase(it);
+            }
+            // Log the implicit-ACK packet so it is visible in the monitor app
+            {
+                PacketLogEntry le = {};
+                le.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000);
+                le.from = packet.from;
+                le.to = packet.to;
+                le.id = packet.id;
+                le.size = (packet.which_payload_variant == meshtastic_MeshPacket_encrypted_tag)
+                              ? packet.encrypted.size + (uint16_t)sizeof(PacketHeader)
+                              : 0;
+                le.rssi = _last_rx_rssi;
+                le.snr = _last_rx_snr;
+                le.channel = packet.channel;
+                le.hop_limit = packet.hop_limit;
+                le.hop_start = packet.hop_start;
+                le.want_ack = packet.want_ack;
+                le.is_tx = false;
+                le.decoded = false; // payload is our own encrypted data; don't re-decode
+                le.port = 0;
+                MeshDataStore::getInstance().addPacketLogEntry(le);
             }
             return;
         }
