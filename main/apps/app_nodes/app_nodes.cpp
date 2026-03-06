@@ -36,8 +36,8 @@ static const char* HINT_LIST_FN = "[\u2191]HOME [\u2193]END [T]RACE";
 static const char* HINT_DM = "[Fn] [^] [\u2191][\u2193][\u2190][\u2192] [I] [ENTER][DEL] [ESC]";
 static const char* HINT_DM_FN = "[\u2191]HOME [\u2193]END";
 static const char* HINT_DETAIL = "[T]RACE [ENTER]DM [ESC]";
-static const char* HINT_TR_LOG = "[\u2191][\u2193] [ENTER] [T]RACE [ESC]";
-static const char* HINT_TR_DETAIL = "[\u2191][\u2193] [ESC]";
+static const char* HINT_TR_LOG = "[\u2191][\u2193][\u2190][\u2192] [ENTER] [T]RACE [ESC]";
+static const char* HINT_TR_DETAIL = "[\u2191][\u2193][\u2190][\u2192] [ESC]";
 
 // Sort order selection dialog
 static const std::vector<std::string> sort_labels = {
@@ -2469,6 +2469,30 @@ void AppNodes::_handle_traceroute_log_input()
                 _data.update_list = true;
             }
         }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_RIGHT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                int page = (_data.hal->canvas()->height() - 15 - 9) / (LIST_ITEM_HEIGHT + 1);
+                int last = (int)_data.tr_total_count - 1;
+                if (_data.tr_selected_index < last)
+                {
+                    _data.tr_selected_index = std::min(_data.tr_selected_index + page, last);
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_LEFT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.tr_selected_index > 0)
+            {
+                int page = (_data.hal->canvas()->height() - 15 - 9) / (LIST_ITEM_HEIGHT + 1);
+                _data.tr_selected_index = std::max(_data.tr_selected_index - page, 0);
+                _data.hal->playNextSound();
+                _data.update_list = true;
+            }
+        }
     }
     else
     {
@@ -2658,7 +2682,6 @@ void AppNodes::_handle_traceroute_detail_input()
             if (key_repeat_check(is_repeat, next_fire_ts, now))
             {
                 const auto& r = _data.tr_detail_result;
-                // 1(hdr to) + 1(origin) + route_to + 1(dest) + 1(hdr back) + 1(dest) + route_back + 1(us)
                 int total_rows = 6 + (int)r.route_to.size() + (int)r.route_back.size();
                 int max_visible = (_data.hal->canvas()->height() - 25) / 14;
                 int max_scroll = std::max(0, total_rows - max_visible);
@@ -2675,6 +2698,32 @@ void AppNodes::_handle_traceroute_detail_input()
             if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.tr_detail_scroll > 0)
             {
                 _data.tr_detail_scroll--;
+                _data.hal->playNextSound();
+                _data.update_list = true;
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_RIGHT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                const auto& r = _data.tr_detail_result;
+                int total_rows = 6 + (int)r.route_to.size() + (int)r.route_back.size();
+                int max_visible = (_data.hal->canvas()->height() - 25) / 14;
+                int max_scroll = std::max(0, total_rows - max_visible);
+                if (_data.tr_detail_scroll < max_scroll)
+                {
+                    _data.tr_detail_scroll = std::min(_data.tr_detail_scroll + max_visible, max_scroll);
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_LEFT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.tr_detail_scroll > 0)
+            {
+                int max_visible = (_data.hal->canvas()->height() - 25) / 14;
+                _data.tr_detail_scroll = std::max(_data.tr_detail_scroll - max_visible, 0);
                 _data.hal->playNextSound();
                 _data.update_list = true;
             }
