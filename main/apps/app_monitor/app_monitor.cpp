@@ -292,6 +292,11 @@ bool AppMonitor::_render_packet_list()
             known_from = true;
             from_label = ni.info.user.short_name;
         }
+        else if (pkt.from == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
+        {
+            known_from = true;
+            from_label = _data.hal->mesh()->getConfig().short_name;
+        }
         else
             from_label = std::format("{:04x}", (unsigned)(pkt.from & 0xFFFF));
         // coloring only known nodes
@@ -325,6 +330,11 @@ bool AppMonitor::_render_packet_list()
         {
             known_to = true;
             to_label = ni.info.user.short_name;
+        }
+        else if (pkt.to == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
+        {
+            known_to = true;
+            to_label = _data.hal->mesh()->getConfig().short_name;
         }
         else
             to_label = std::format("{:04x}", (unsigned)(pkt.to & 0xFFFF));
@@ -468,6 +478,7 @@ bool AppMonitor::_render_packet_detail()
     };
 
     auto* nodedb = _data.hal->nodedb();
+    uint32_t our_id = _data.hal->mesh() ? _data.hal->mesh()->getNodeId() : 0;
     // CRC error notice
     if (pkt.crc_error)
     {
@@ -481,6 +492,8 @@ bool AppMonitor::_render_packet_detail()
             snprintf(buf, sizeof(buf), "unknown (header corrupt)");
         else if (nodedb && nodedb->getNode(pkt.from, ni) && ni.info.user.short_name[0])
             snprintf(buf, sizeof(buf), "%s (!%08lx)", ni.info.user.short_name, (unsigned long)pkt.from);
+        else if (pkt.from == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
+            snprintf(buf, sizeof(buf), "%s (!%08lx)", _data.hal->mesh()->getConfig().short_name, (unsigned long)pkt.from);
         else
             snprintf(buf, sizeof(buf), "!%08lx", (unsigned long)pkt.from);
         add_row("From", buf);
@@ -495,6 +508,8 @@ bool AppMonitor::_render_packet_detail()
             snprintf(buf, sizeof(buf), "BROADCAST");
         else if (nodedb && nodedb->getNode(pkt.to, ni) && ni.info.user.short_name[0])
             snprintf(buf, sizeof(buf), "%s (!%08lx)", ni.info.user.short_name, (unsigned long)pkt.to);
+        else if (pkt.to == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
+            snprintf(buf, sizeof(buf), "%s (!%08lx)", _data.hal->mesh()->getConfig().short_name, (unsigned long)pkt.to);
         else
             snprintf(buf, sizeof(buf), "!%08lx", (unsigned long)pkt.to);
         add_row("To", buf);

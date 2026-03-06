@@ -538,6 +538,7 @@ bool AppNodes::_render_node_list()
 
     std::vector<Mesh::NodeInfo> visible_nodes;
     size_t loaded = nodedb->getNodesInRange(_data.scroll_offset, LIST_MAX_VISIBLE_ITEMS, visible_nodes, _data.sort_order);
+    uint32_t our_id = _data.hal->mesh() ? _data.hal->mesh()->getNodeId() : 0;
 
     auto& store = Mesh::MeshDataStore::getInstance();
 
@@ -766,7 +767,10 @@ bool AppNodes::_render_node_list()
                     short_name = relay_info.info.user.short_name;
                     if (short_name.empty())
                     {
-                        short_name = std::format("{:04x}", relay_node_id & 0xFFFF);
+                        if (relay_node_id == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
+                            short_name = _data.hal->mesh()->getConfig().short_name;
+                        else
+                            short_name = std::format("{:04x}", relay_node_id & 0xFFFF);
                     }
                     // Truncate to 4 chars
                     if (utf8_char_count(short_name.c_str()) > 4)
@@ -2495,19 +2499,20 @@ bool AppNodes::_render_traceroute_detail()
 
     auto* nodedb = _data.hal->nodedb();
 
-    // Helper: resolve short name from node ID
-    auto get_short = [nodedb](uint32_t nid) -> std::string
+    // Helper: resolve short name from node ID (falls back to mesh config for our own node)
+    uint32_t our_id = _data.hal->mesh() ? _data.hal->mesh()->getNodeId() : 0;
+    auto* tr_mesh = _data.hal->mesh();
+    auto get_short = [nodedb, tr_mesh, our_id](uint32_t nid) -> std::string
     {
-        if (!nodedb)
-            return std::format("{:04x}", nid & 0xFFFF);
         Mesh::NodeInfo ni;
-        if (nodedb->getNode(nid, ni) && ni.info.user.short_name[0])
+        if (nodedb && nodedb->getNode(nid, ni) && ni.info.user.short_name[0])
             return ni.info.user.short_name;
+        if (tr_mesh && nid == our_id && tr_mesh->getConfig().short_name[0])
+            return tr_mesh->getConfig().short_name;
         return std::format("{:04x}", nid & 0xFFFF);
     };
 
     // Our node badge (left)
-    uint32_t our_id = _data.hal->mesh() ? _data.hal->mesh()->getNodeId() : 0;
     std::string our_name = get_short(our_id);
     uint32_t our_badge_color = _get_node_color(our_id);
     uint32_t our_badge_text = _get_node_text_color(our_id);
