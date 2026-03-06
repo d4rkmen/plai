@@ -444,7 +444,9 @@ namespace UTILS
                             // Back item
                             in_group = false;
                             selected_item = 0;
-                            scroll_offset = 0;
+                            int line_height = hal->canvas()->fontHeight(FONT_16) + 2 + 1;
+                            int max_visible_groups = (hal->canvas()->height() - ITEMS_Y_OFFSET - HINT_HEIGHT) / line_height;
+                            scroll_offset = std::max(0, selected_group - max_visible_groups + 1);
                             selection_changed = true;
                         }
                         else if (item.type == SETTINGS::TYPE_CALLBACK)
