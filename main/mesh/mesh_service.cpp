@@ -2529,7 +2529,7 @@ namespace Mesh
         }
 
         // Handle want_response - send our NodeInfo back if requested
-        if (packet.decoded.want_response)
+        if (packet.decoded.want_response && packet.to == _config.node_id)
         {
             // Certain roles should not respond to NodeInfo requests
             // TRACKER and SENSOR are low-power devices that shouldn't respond
