@@ -118,8 +118,14 @@ namespace Mesh
         size_t public_key_len; // 0 = no key, 32 = valid
 
         // Position configuration
-        bool fixed_position;     // True if using a manually set fixed position
-        int32_t fixed_latitude;  // Fixed latitude (degrees * 1e7)
+        enum PositionMode
+        {
+            POSITION_OFF,
+            POSITION_FIXED,
+            POSITION_GPS
+        };
+        PositionMode position = POSITION_OFF; // Position source: off, fixed coords, or live GPS
+        int32_t fixed_latitude;   // Fixed latitude (degrees * 1e7)
         int32_t fixed_longitude; // Fixed longitude (degrees * 1e7)
         int32_t fixed_altitude;  // Fixed altitude MSL (meters)
         uint32_t position_flags; // Bitwise OR of meshtastic_Config_PositionConfig_PositionFlags

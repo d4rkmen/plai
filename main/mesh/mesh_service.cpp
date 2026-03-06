@@ -450,9 +450,8 @@ namespace Mesh
           _connection_callback(nullptr), _battery_callback(nullptr), _fromradio_state(FromRadioState::IDLE),
           _fromradio_config_id(0), _fromradio_node_index(0), _fromradio_channel_index(0), _last_nodeinfo_broadcast_ms(0),
           _force_nodeinfo_broadcast(false), _last_position_broadcast_ms(0), _last_telemetry_broadcast_ms(0),
-          _tx_in_progress(false), _last_tx_start_ms(0),
-          _last_rx_rssi(0), _last_rx_snr(0.0f), _airtime_window_start_ms(0), _airtime_tx_ms(0), _airtime_rx_ms(0),
-          _airtime_tx_ms_prev(0), _airtime_rx_ms_prev(0)
+          _tx_in_progress(false), _last_tx_start_ms(0), _last_rx_rssi(0), _last_rx_snr(0.0f), _airtime_window_start_ms(0),
+          _airtime_tx_ms(0), _airtime_rx_ms(0), _airtime_tx_ms_prev(0), _airtime_rx_ms_prev(0)
     {
         _hal = hal;
         memset(&_config, 0, sizeof(_config));
@@ -659,30 +658,28 @@ namespace Mesh
             }
         }
 
-        // Periodic node info broadcast; also fires immediately when forced by a settings change
-        if (_force_nodeinfo_broadcast ||
-            (_config.nodeinfo_broadcast_interval_ms > 0 &&
-             now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms))
+        // Periodic node info broadcast (every 60 seconds)
+        if (_config.nodeinfo_broadcast_interval_ms > 0 &&
+            now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms)
         {
             broadcastNodeInfo();
             _last_nodeinfo_broadcast_ms = now;
-            _force_nodeinfo_broadcast = false;
         }
 
         // Periodic position broadcast (every 15 minutes)
         // Only send if we have a position source (GPS fix or fixed position)
-        if (_config.position_broadcast_interval_ms > 0 &&
+        if (_config.position != MeshConfig::POSITION_OFF && _config.position_broadcast_interval_ms > 0 &&
             now - _last_position_broadcast_ms >= _config.position_broadcast_interval_ms)
         {
             // If fixed position is configured, only send that (privacy: never leak live GPS)
             // Otherwise, send live GPS if available
             bool should_send = false;
-            if (_config.fixed_position)
+            if (_config.position == MeshConfig::POSITION_FIXED)
             {
                 should_send = true;
                 ESP_LOGD(TAG, "Broadcasting fixed position");
             }
-            else if (_gps && _gps->hasFix())
+            else if (_config.position == MeshConfig::POSITION_GPS && _gps && _gps->hasFix())
             {
                 should_send = true;
                 ESP_LOGD(TAG, "Broadcasting GPS position");
@@ -1146,7 +1143,7 @@ namespace Mesh
         }
 
         // Position configuration
-        _config.fixed_position = config.fixed_position;
+        _config.position = config.position;
         _config.fixed_latitude = config.fixed_latitude;
         _config.fixed_longitude = config.fixed_longitude;
         _config.fixed_altitude = config.fixed_altitude;
@@ -2588,8 +2585,13 @@ namespace Mesh
         // TRACKER and TAK_TRACKER are GPS-focused devices but respond on their own schedule
         // SENSOR is a low-power device that shouldn't respond
         // CLIENT_HIDDEN should remain hidden
-        if (packet.decoded.want_response)
+        if (packet.decoded.want_response && packet.to == _config.node_id)
         {
+            if (_config.position == MeshConfig::POSITION_OFF)
+            {
+                ESP_LOGD(TAG, "Skipping Position response due to position mode (off)");
+                return;
+            }
             if (_config.role == meshtastic_Config_DeviceConfig_Role_TRACKER ||
                 _config.role == meshtastic_Config_DeviceConfig_Role_TAK_TRACKER ||
                 _config.role == meshtastic_Config_DeviceConfig_Role_SENSOR ||
@@ -2598,7 +2600,6 @@ namespace Mesh
                 ESP_LOGD(TAG, "Skipping Position response due to device role (%d)", static_cast<int>(_config.role));
                 return;
             }
-
             ESP_LOGI(TAG, "Responding to Position request from 0x%08lx channel %d", (unsigned long)packet.from, packet.channel);
             sendPosition(packet.from, packet.channel);
         }
@@ -3372,13 +3373,6 @@ namespace Mesh
         sendNodeInfo(0xFFFFFFFF, 0, false);
     }
 
-    void MeshService::forceNodeInfoBroadcast()
-    {
-        ESP_LOGI(TAG, "Forcing node info broadcast on next update cycle");
-        _force_nodeinfo_broadcast = true;
-        _last_nodeinfo_broadcast_ms = 0;
-    }
-
     void MeshService::sendNodeInfo(uint32_t dest, uint8_t channel, bool want_response)
     {
         if (!_nodedb)
@@ -3552,7 +3546,7 @@ namespace Mesh
         const uint32_t pf = _config.position_flags;
 
         // If fixed position is configured, always use it (privacy: never leak live GPS)
-        if (_config.fixed_position)
+        if (_config.position == MeshConfig::POSITION_FIXED)
         {
             position.has_latitude_i = true;
             position.latitude_i = _config.fixed_latitude;
@@ -3573,8 +3567,8 @@ namespace Mesh
                      (long)position.altitude,
                      (unsigned long)pf);
         }
-        // Otherwise use live GPS if available
-        else if (_gps && _gps->hasFix())
+        // Otherwise use live GPS if available (POSITION_GPS mode)
+        else if (_config.position == MeshConfig::POSITION_GPS && _gps && _gps->hasFix())
         {
             position.has_latitude_i = true;
             position.latitude_i = _gps->getLatitudeI();
@@ -4379,7 +4373,13 @@ namespace Mesh
         }
 
         // Position
-        config.fixed_position = (_settings->getString("position", "location") == "fixed");
+        const std::string location = _settings->getString("position", "location");
+        if (location == "fixed")
+            config.position = MeshConfig::POSITION_FIXED;
+        else if (location == "gps")
+            config.position = MeshConfig::POSITION_GPS;
+        else
+            config.position = MeshConfig::POSITION_OFF;
         config.fixed_latitude = _settings->getNumber("position", "latitude");
         config.fixed_longitude = _settings->getNumber("position", "longitude");
         config.fixed_altitude = _settings->getNumber("position", "altitude");
@@ -4399,7 +4399,11 @@ namespace Mesh
         if (_settings->getBool("position", "pos_speed"))
             pf |= meshtastic_Config_PositionConfig_PositionFlags_SPEED;
         config.position_flags = pf;
-        if (config.fixed_position)
+        if (config.position == MeshConfig::POSITION_OFF)
+        {
+            ESP_LOGI(TAG, "Position broadcasting disabled (location=off)");
+        }
+        else if (config.position == MeshConfig::POSITION_FIXED)
         {
             ESP_LOGI(TAG,
                      "Using fixed position: lat=%ld lon=%ld alt=%ld",
