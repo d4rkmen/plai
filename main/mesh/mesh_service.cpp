@@ -4421,4 +4421,11 @@ namespace Mesh
         config.telemetry_broadcast_interval_ms = parseIntervalToMs(_settings->getString("devmetrics", "bcast_int"));
     }
 
+    void MeshService::forceNodeInfoBroadcast()
+    {
+        ESP_LOGI(TAG, "Forcing node info broadcast on next update cycle");
+        _last_nodeinfo_broadcast_ms = 0;
+        _force_nodeinfo_broadcast = true;
+    }
+
 } // namespace Mesh
