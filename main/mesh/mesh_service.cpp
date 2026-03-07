@@ -658,12 +658,14 @@ namespace Mesh
             }
         }
 
-        // Periodic node info broadcast (every 60 seconds)
-        if (_config.nodeinfo_broadcast_interval_ms > 0 &&
-            now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms)
+        // Periodic node info broadcast (every 60 seconds), or forced immediately
+        if (_force_nodeinfo_broadcast ||
+            (_config.nodeinfo_broadcast_interval_ms > 0 &&
+             now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms))
         {
             broadcastNodeInfo();
             _last_nodeinfo_broadcast_ms = now;
+            _force_nodeinfo_broadcast = false;
         }
 
         // Periodic position broadcast (every 15 minutes)
