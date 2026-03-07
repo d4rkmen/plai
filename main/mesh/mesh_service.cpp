@@ -725,7 +725,10 @@ namespace Mesh
                              "ACK timeout for packet 0x%08lX, retrying (%u retries left)",
                              (unsigned long)it->first,
                              it->second.retries_left);
-                    _router.enqueueTxRaw(it->second.raw_data, it->second.raw_len, PacketPriority::RELIABLE,it->second.port_hint);
+                    _router.enqueueTxRaw(it->second.raw_data,
+                                         it->second.raw_len,
+                                         PacketPriority::RELIABLE,
+                                         it->second.port_hint);
                     ++it;
                 }
                 else
@@ -792,7 +795,7 @@ namespace Mesh
         if (!is_broadcast && _config.public_key_len == 32 && _nodedb)
         {
             NodeInfo dest_node;
-            if (_nodedb->getNode(dest, dest_node) && dest_node.info.user.public_key.size == 32)
+            if (getNode(dest, dest_node) && dest_node.info.user.public_key.size == 32)
             {
 #if MESH_HAS_MBEDTLS
                 // Check payload fits with PKC overhead
@@ -1640,22 +1643,27 @@ namespace Mesh
 
         // ---- PKC decryption attempt (channel==0, DM to us, sender has public key) ----
 #if MESH_HAS_MBEDTLS
-        if (packet.channel == 0 && packet.to != 0xFFFFFFFF && packet.to == _config.node_id &&
+        if (packet.channel == 0 && packet.to != 0xFFFFFFFF /*&& packet.to == _config.node_id */ &&
             packet.encrypted.size > PKC_OVERHEAD && _nodedb && _config.public_key_len == 32)
         {
+            // For our own packets relayed back to us, the other party is the recipient (packet.to),
+            // not the sender (packet.from == us). Use recipient's key to reconstruct the shared secret.
+            bool is_own_packet = (packet.from == _config.node_id);
+            uint32_t peer_id = is_own_packet ? packet.to : packet.from;
+
             NodeInfo sender_node;
-            bool have_sender = _nodedb->getNode(packet.from, sender_node);
+            bool have_sender = getNode(peer_id, sender_node);
             bool have_sender_key = have_sender && sender_node.info.user.public_key.size == 32;
 
             if (!have_sender)
             {
-                ESP_LOGW(TAG, "PKC: sender 0x%08lX not in NodeDB, cannot decrypt", (unsigned long)packet.from);
+                ESP_LOGW(TAG, "PKC: peer 0x%08lX not in NodeDB, cannot decrypt", (unsigned long)peer_id);
             }
             else if (!have_sender_key)
             {
                 ESP_LOGW(TAG,
-                         "PKC: sender 0x%08lX has no public key (size=%u)",
-                         (unsigned long)packet.from,
+                         "PKC: peer 0x%08lX has no public key (size=%u)",
+                         (unsigned long)peer_id,
                          (unsigned)sender_node.info.user.public_key.size);
             }
             else
@@ -1665,7 +1673,7 @@ namespace Mesh
                          (unsigned long)packet.from,
                          (unsigned)packet.encrypted.size);
 
-                // Compute shared secret
+                // Compute shared secret using peer key (recipient when packet is ours, sender otherwise)
                 uint8_t shared_key[32] = {};
                 if (x25519_shared_secret(_config.private_key, sender_node.info.user.public_key.bytes, shared_key))
                 {
@@ -2007,44 +2015,6 @@ namespace Mesh
             packet.via_mqtt ? 1 : 0,
             packet.relay_node);
 
-        // Implicit ACK: hearing another node rebroadcast our packet confirms delivery.
-        // LoRa is half-duplex so we never receive our own TX; this is always a relay.
-        if (packet.from == _config.node_id)
-        {
-            auto it = _pending_acks.find(packet.id);
-            if (it != _pending_acks.end())
-            {
-                ESP_LOGI(TAG,
-                         "Implicit ACK: packet 0x%08lX rebroadcast by relay 0x%02X",
-                         (unsigned long)packet.id,
-                         packet.relay_node);
-                MeshDataStore::getInstance().updateMessageStatus(packet.id, TextMessage::Status::ACK);
-                _pending_acks.erase(it);
-            }
-            // Log the implicit-ACK packet so it is visible in the monitor app
-            {
-                PacketLogEntry le = {};
-                le.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000);
-                le.from = packet.from;
-                le.to = packet.to;
-                le.id = packet.id;
-                le.size = (packet.which_payload_variant == meshtastic_MeshPacket_encrypted_tag)
-                              ? packet.encrypted.size + (uint16_t)sizeof(PacketHeader)
-                              : 0;
-                le.rssi = _last_rx_rssi;
-                le.snr = _last_rx_snr;
-                le.channel = packet.channel;
-                le.hop_limit = packet.hop_limit;
-                le.hop_start = packet.hop_start;
-                le.want_ack = packet.want_ack;
-                le.is_tx = false;
-                le.decoded = false; // payload is our own encrypted data; don't re-decode
-                le.port = 0;
-                MeshDataStore::getInstance().addPacketLogEntry(le);
-            }
-            return;
-        }
-
         meshtastic_MeshPacket decoded_packet = meshtastic_MeshPacket_init_default;
         bool decoded_ok = decodeMeshPacket(packet, decoded_packet);
         if (!decoded_ok && packet.which_payload_variant == meshtastic_MeshPacket_encrypted_tag)
@@ -2074,6 +2044,22 @@ namespace Mesh
             MeshDataStore::getInstance().addPacketLogEntry(le);
         }
 
+        // Implicit ACK: hearing another node rebroadcast our packet confirms delivery.
+        // LoRa is half-duplex so we never receive our own TX; this is always a relay.
+        if (packet.from == _config.node_id)
+        {
+            auto it = _pending_acks.find(packet.id);
+            if (it != _pending_acks.end())
+            {
+                ESP_LOGI(TAG,
+                         "Implicit ACK: packet 0x%08lX rebroadcast by relay 0x%02X",
+                         (unsigned long)packet.id,
+                         packet.relay_node);
+                MeshDataStore::getInstance().updateMessageStatus(packet.id, TextMessage::Status::ACK);
+                _pending_acks.erase(it);
+            }
+        }
+
         if (decoded_ok && decoded_packet.which_payload_variant == meshtastic_MeshPacket_decoded_tag)
         {
             ESP_LOGI(TAG,
@@ -2101,7 +2087,7 @@ namespace Mesh
                 // else hops_away stays 0 (direct connection or unknown)
 
                 Mesh::NodeInfo node_info;
-                if (_nodedb->getNode(decoded_packet.from, node_info))
+                if (getNode(decoded_packet.from, node_info))
                 {
                     // Update existing node with new signal values
                     node_info.last_rssi = _last_rx_rssi;
@@ -2302,7 +2288,7 @@ namespace Mesh
                                     hops_away = decoded_packet.hop_start - decoded_packet.hop_limit;
 
                                 NodeInfo node_info;
-                                const NodeInfo* np = _nodedb->getNode(decoded_packet.from, node_info) ? &node_info : nullptr;
+                                const NodeInfo* np = getNode(decoded_packet.from, node_info) ? &node_info : nullptr;
 
                                 char expanded[256];
                                 expandGreetingTemplate(greeting.ping_text,
@@ -2447,7 +2433,7 @@ namespace Mesh
                 if (decoded_ok && _nodedb)
                 {
                     Mesh::NodeInfo node_info;
-                    should_rebroadcast = _nodedb->getNode(packet.from, node_info);
+                    should_rebroadcast = getNode(packet.from, node_info);
                 }
             }
             // CORE_PORTNUMS_ONLY: only standard portnums (must be decodable)
@@ -2531,7 +2517,7 @@ namespace Mesh
         if (_nodedb)
         {
             NodeInfo prev;
-            bool had_user = _nodedb->getNode(packet.from, prev) && prev.info.has_user;
+            bool had_user = getNode(packet.from, prev) && prev.info.has_user;
 
             _nodedb->updateUser(packet.from, user);
 
@@ -2541,7 +2527,7 @@ namespace Mesh
                 uint8_t hops = 0;
                 int16_t rssi = 0;
                 float snr = 0;
-                if (_nodedb->getNode(packet.from, updated))
+                if (getNode(packet.from, updated))
                 {
                     hops = updated.info.has_hops_away ? updated.info.hops_away : 0;
                     rssi = updated.last_rssi;
@@ -2660,7 +2646,7 @@ namespace Mesh
             if (_nodedb)
             {
                 Mesh::NodeInfo node_info;
-                if (_nodedb->getNode(packet.from, node_info))
+                if (getNode(packet.from, node_info))
                 {
                     // Update device metrics
                     node_info.info.has_device_metrics = true;
@@ -3919,7 +3905,7 @@ namespace Mesh
         const auto& greeting = _nodedb->getGreeting(channel);
 
         NodeInfo node_info;
-        const NodeInfo* node_ptr = _nodedb->getNode(node_id, node_info) ? &node_info : nullptr;
+        const NodeInfo* node_ptr = getNode(node_id, node_info) ? &node_info : nullptr;
 
         char expanded[256];
 
