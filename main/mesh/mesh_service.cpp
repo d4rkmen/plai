@@ -659,9 +659,8 @@ namespace Mesh
         }
 
         // Periodic node info broadcast (every 60 seconds), or forced immediately
-        if (_force_nodeinfo_broadcast ||
-            (_config.nodeinfo_broadcast_interval_ms > 0 &&
-             now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms))
+        if (_force_nodeinfo_broadcast || (_config.nodeinfo_broadcast_interval_ms > 0 &&
+                                          now - _last_nodeinfo_broadcast_ms >= _config.nodeinfo_broadcast_interval_ms))
         {
             broadcastNodeInfo();
             _last_nodeinfo_broadcast_ms = now;
@@ -2060,6 +2059,7 @@ namespace Mesh
                 MeshDataStore::getInstance().updateMessageStatus(packet.id, TextMessage::Status::ACK);
                 _pending_acks.erase(it);
             }
+            return;
         }
 
         if (decoded_ok && decoded_packet.which_payload_variant == meshtastic_MeshPacket_decoded_tag)
