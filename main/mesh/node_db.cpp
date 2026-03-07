@@ -409,6 +409,16 @@ namespace Mesh
         return nullptr;
     }
 
+    std::string NodeDB::getLabel(const NodeInfo& node)
+    {
+        std::string label = node.info.user.short_name;
+        if (label.empty())
+        {
+            label = std::format("{:04x}", node.info.num & 0xFFFF);
+        }
+        return label;
+    }
+
     void NodeDB::fillIndexEntryFromNode(NodeIndexEntry& entry, const NodeInfo& node)
     {
         entry.node_id = node.info.num;

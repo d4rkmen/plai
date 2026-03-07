@@ -287,15 +287,10 @@ bool AppMonitor::_render_packet_list()
         {
             from_label = "????";
         }
-        else if (nodedb && nodedb->getNode(pkt.from, ni) && ni.info.user.short_name[0])
+        else if (_data.hal->mesh() && _data.hal->mesh()->getNode(pkt.from, ni))
         {
             known_from = true;
-            from_label = ni.info.user.short_name;
-        }
-        else if (pkt.from == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
-        {
-            known_from = true;
-            from_label = _data.hal->mesh()->getConfig().short_name;
+            from_label = Mesh::NodeDB::getLabel(ni);
         }
         else
             from_label = std::format("{:04x}", (unsigned)(pkt.from & 0xFFFF));
@@ -326,15 +321,10 @@ bool AppMonitor::_render_packet_list()
             to_label = "????";
         else if (pkt.to == 0xFFFFFFFF)
             to_label = "\u2192\u2192\u2192";
-        else if (nodedb && nodedb->getNode(pkt.to, ni) && ni.info.user.short_name[0])
+        else if (_data.hal->mesh() && _data.hal->mesh()->getNode(pkt.to, ni))
         {
             known_to = true;
-            to_label = ni.info.user.short_name;
-        }
-        else if (pkt.to == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
-        {
-            known_to = true;
-            to_label = _data.hal->mesh()->getConfig().short_name;
+            to_label = Mesh::NodeDB::getLabel(ni);
         }
         else
             to_label = std::format("{:04x}", (unsigned)(pkt.to & 0xFFFF));

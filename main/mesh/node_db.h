@@ -129,6 +129,14 @@ namespace Mesh
         bool save();
 
         /**
+         * @brief Get a display label for a node: short_name if set, otherwise lower-16-bit hex,
+         *        truncated to 4 UTF-8 characters.
+         * @param node Node to derive the label from
+         * @return Display label string
+         */
+        static std::string getLabel(const NodeInfo& node);
+
+        /**
          * @brief Get number of nodes in database
          * @return Node count
          */

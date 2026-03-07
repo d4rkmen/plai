@@ -33,10 +33,7 @@ namespace HAL
     class GPS;
 }
 
-namespace Mesh
-{
-    class NodeDB;
-}
+#include "node_db.h"
 
 namespace Mesh
 {
@@ -317,6 +314,14 @@ namespace Mesh
          * Resets the broadcast timer so the interval check fires immediately
          */
         void forceNodeInfoBroadcast();
+
+        /**
+         * @brief Get node by ID
+         * @param node_id Node ID
+         * @param out NodeInfo to fill
+         * @return true if found
+         */
+        bool getNode(uint32_t node_id, NodeInfo& out) const;
 
     private:
         HAL::Hal* _hal;

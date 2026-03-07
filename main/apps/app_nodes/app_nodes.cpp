@@ -585,16 +585,7 @@ bool AppNodes::_render_node_list()
         // 1. Node ID / Short name with colored background
         uint32_t node_color = _get_node_color(node.info.num);
         uint32_t node_text_color = _get_node_text_color(node.info.num);
-        std::string short_name = node.info.user.short_name;
-        if (short_name.empty())
-        {
-            short_name = std::format("{:04x}", node.info.num & 0xFFFF);
-        }
-        // Truncate to 4 chars
-        if (utf8_char_count(short_name.c_str()) > 4)
-        {
-            short_name = short_name.substr(0, utf8_truncate_len(short_name.c_str(), 4));
-        }
+        std::string short_name = Mesh::NodeDB::getLabel(node);
         canvas->fillRoundRect(short_x, y_offset + 1, COL_SHORT_NAME_WIDTH, LIST_ITEM_HEIGHT, 4, node_color);
         canvas->setTextColor(node_text_color, node_color);
         canvas->drawCenterString(short_name.c_str(), short_x + COL_SHORT_NAME_WIDTH / 2, y_offset + 1);
@@ -761,22 +752,11 @@ bool AppNodes::_render_node_list()
             if (relay_node_id != 0)
             {
                 Mesh::NodeInfo relay_info;
+                // using nodedb (not mesh wrapper) because no our node in the list
                 if (nodedb->getNode(relay_node_id, relay_info))
                 {
                     have_relay_node = true;
-                    short_name = relay_info.info.user.short_name;
-                    if (short_name.empty())
-                    {
-                        if (relay_node_id == our_id && _data.hal->mesh() && _data.hal->mesh()->getConfig().short_name[0])
-                            short_name = _data.hal->mesh()->getConfig().short_name;
-                        else
-                            short_name = std::format("{:04x}", relay_node_id & 0xFFFF);
-                    }
-                    // Truncate to 4 chars
-                    if (utf8_char_count(short_name.c_str()) > 4)
-                    {
-                        short_name = short_name.substr(0, utf8_truncate_len(short_name.c_str(), 4));
-                    }
+                    short_name = Mesh::NodeDB::getLabel(relay_info);
                 }
             }
         }

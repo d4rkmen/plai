@@ -282,17 +282,15 @@ std::string AppChannels::_get_sender_name(uint32_t node_id)
     if (_data.hal->mesh() && node_id == _data.hal->mesh()->getNodeId())
         return "Me";
 
-    if (!_data.hal->nodedb())
+    if (_data.hal->nodedb())
     {
-        return std::format("{:04x}", node_id & 0xFFFF);
-    }
 
-    Mesh::NodeInfo node;
-    if (_data.hal->nodedb()->getNode(node_id, node) && node.info.user.short_name[0] != '\0')
-    {
-        return std::string(node.info.user.short_name);
+        Mesh::NodeInfo node;
+        if (_data.hal->nodedb()->getNode(node_id, node))
+        {
+            return Mesh::NodeDB::getLabel(node);
+        }
     }
-
     return std::format("{:04x}", node_id & 0xFFFF);
 }
 

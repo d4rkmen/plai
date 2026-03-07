@@ -3562,6 +3562,36 @@ namespace Mesh
         }
     }
 
+    bool MeshService::getNode(uint32_t node_id, NodeInfo& out) const
+    {
+        if (node_id == _config.node_id)
+        {
+            out = {};
+            out.info.num = _config.node_id;
+            strncpy(out.info.user.short_name, _config.short_name, sizeof(out.info.user.short_name) - 1);
+            strncpy(out.info.user.long_name, _config.long_name, sizeof(out.info.user.long_name) - 1);
+            snprintf(out.info.user.id, sizeof(out.info.user.id), "!%08lx", (unsigned long)_config.node_id);
+            out.info.user.hw_model = meshtastic_HardwareModel_M5STACK_CARDPUTER_ADV;
+            out.info.user.role = _config.role;
+            esp_read_mac(out.info.user.macaddr, ESP_MAC_BT);
+            if (_config.public_key_len == 32)
+            {
+                memcpy(out.info.user.public_key.bytes, _config.public_key, 32);
+                out.info.user.public_key.size = 32;
+            }
+            out.info.user.has_is_unmessagable = true;
+            out.info.user.is_unmessagable = _config.is_unmessagable;
+            out.last_rssi = 0;
+            out.relay_node = 0;
+            return true;
+        }
+        if (_nodedb)
+        {
+            return _nodedb->getNode(node_id, out);
+        }
+        return false;
+    }
+
     bool MeshService::sendPosition(uint32_t dest, uint8_t channel)
     {
         meshtastic_Position position = meshtastic_Position_init_default;
