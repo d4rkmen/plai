@@ -151,6 +151,13 @@ namespace SETTINGS
          */
         void applyMeshConfig(SettingItem_t& item);
 
+        /**
+         * @brief Translate a human-readable timezone label (e.g. "GMT+2") to a POSIX TZ
+         *        string and apply it to the system environment via setenv/tzset.
+         * @param tz Timezone label (see system settings timezone option list)
+         */
+        static void applyTimezone(const std::string& tz);
+
     private:
         static const char* const NVS_PARTITIONS[];
         const char* _active_partition = nullptr;

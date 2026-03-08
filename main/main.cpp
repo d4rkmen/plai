@@ -38,6 +38,7 @@ extern "C" void app_main(void)
     // Settings init
     settings.init();
     settings.setHal(&hal);
+    Settings::applyTimezone(settings.getString("system", "timezone"));
 
     // Init hal (includes radio and mesh service initialization)
     hal.init();

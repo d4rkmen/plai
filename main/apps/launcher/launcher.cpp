@@ -332,55 +332,6 @@ void Launcher::_update_system_state()
         }
     }
 #endif
-    // Apply timezone from settings (once, or when changed)
-    static std::string last_tz;
-    std::string tz = _data.hal->settings()->getString("system", "timezone");
-    if (tz != last_tz)
-    {
-        // Lookup table: human-readable label -> POSIX TZ string
-        // POSIX sign convention is inverted: UTC+2 = "<GMT+2>-2"
-        static const struct
-        {
-            const char* label;
-            const char* posix;
-        } tz_table[] = {
-            {"GMT-12", "<GMT-12>12"},        {"GMT-11", "<GMT-11>11"},        {"GMT-10", "<GMT-10>10"},
-            {"GMT-9:30", "<GMT-9:30>9:30"},  {"GMT-9", "<GMT-9>9"},           {"GMT-8", "<GMT-8>8"},
-            {"GMT-7", "<GMT-7>7"},           {"GMT-6", "<GMT-6>6"},           {"GMT-5", "<GMT-5>5"},
-            {"GMT-4", "<GMT-4>4"},           {"GMT-3:30", "<GMT-3:30>3:30"},  {"GMT-3", "<GMT-3>3"},
-            {"GMT-2", "<GMT-2>2"},           {"GMT-1", "<GMT-1>1"},           {"GMT+0", "GMT0"},
-            {"GMT+1", "<GMT+1>-1"},          {"GMT+2", "<GMT+2>-2"},          {"GMT+3", "<GMT+3>-3"},
-            {"GMT+3:30", "<GMT+3:30>-3:30"}, {"GMT+4", "<GMT+4>-4"},          {"GMT+4:30", "<GMT+4:30>-4:30"},
-            {"GMT+5", "<GMT+5>-5"},          {"GMT+5:30", "<GMT+5:30>-5:30"}, {"GMT+5:45", "<GMT+5:45>-5:45"},
-            {"GMT+6", "<GMT+6>-6"},          {"GMT+6:30", "<GMT+6:30>-6:30"}, {"GMT+7", "<GMT+7>-7"},
-            {"GMT+8", "<GMT+8>-8"},          {"GMT+8:45", "<GMT+8:45>-8:45"}, {"GMT+9", "<GMT+9>-9"},
-            {"GMT+9:30", "<GMT+9:30>-9:30"}, {"GMT+10", "<GMT+10>-10"},       {"GMT+10:30", "<GMT+10:30>-10:30"},
-            {"GMT+11", "<GMT+11>-11"},       {"GMT+12", "<GMT+12>-12"},       {"GMT+13", "<GMT+13>-13"},
-            {"GMT+14", "<GMT+14>-14"},
-        };
-
-        const char* posix_tz = "GMT0"; // fallback to UTC
-        for (const auto& entry : tz_table)
-        {
-            if (tz == entry.label)
-            {
-                posix_tz = entry.posix;
-                break;
-            }
-        }
-
-        setenv("TZ", posix_tz, 1);
-        tzset();
-        last_tz = tz;
-        ESP_LOGW(TAG, "Timezone set: %s -> %s", tz.c_str(), posix_tz);
-        // current dattetime is
-        time_t now;
-        time(&now);
-        struct tm timeinfo;
-        localtime_r(&now, &timeinfo);
-        ESP_LOGW(TAG, "Current date and time: %s", asctime(&timeinfo));
-    }
-
     // Time display
     // if (_data.hal->isGPSAdjusted())
     {
