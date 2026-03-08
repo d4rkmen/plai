@@ -381,28 +381,6 @@ void Launcher::_update_system_state()
         ESP_LOGW(TAG, "Current date and time: %s", asctime(&timeinfo));
     }
 
-    // Sync system time from GPS when available (initial + refresh every hour)
-    static uint32_t last_gps_sync_ms = 0;
-    constexpr uint32_t GPS_SYNC_INTERVAL_MS = 3600000; // 1 hour
-    bool gps_needs_sync =
-        !_data.hal->isGPSAdjusted() || (last_gps_sync_ms > 0 && (millis() - last_gps_sync_ms) >= GPS_SYNC_INTERVAL_MS);
-    if (gps_needs_sync && _data.hal->gps() && _data.hal->gps()->hasFix())
-    {
-        auto gps_data = _data.hal->gps()->getData();
-        if (gps_data.year >= 2026 && gps_data.time > 0)
-        {
-            struct timeval tv = {.tv_sec = (time_t)gps_data.time, .tv_usec = 0};
-            settimeofday(&tv, nullptr);
-            if (!_data.hal->isGPSAdjusted())
-            {
-                _data.hal->playNotificationSound(HAL::Hal::NotificationSound::GPS);
-                _data.hal->setGPSAdjusted(true);
-            }
-            last_gps_sync_ms = millis();
-            ESP_LOGW(TAG, "System time set from GPS: %lu", (unsigned long)gps_data.time);
-        }
-    }
-
     // Time display
     // if (_data.hal->isGPSAdjusted())
     {

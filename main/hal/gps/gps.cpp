@@ -116,6 +116,8 @@ namespace HAL
         _initialized = false;
     }
 
+    void GPS::setDataCallback(DataCallback cb) { _data_callback = std::move(cb); }
+
     GpsData GPS::getData() const
     {
         // Simple copy - GpsData is small and updated atomically per-field
@@ -524,6 +526,14 @@ namespace HAL
                      _data.minute,
                      _data.second);
             _data.time = _to_unix_time(_data.year, _data.month, _data.day, _data.hour, _data.minute, _data.second);
+        }
+
+        // Notify subscriber with a consistent snapshot
+        if (_data.has_fix && _data.time > 0 && _data_callback)
+        {
+            GpsData snapshot;
+            memcpy(&snapshot, (const void*)&_data, sizeof(GpsData));
+            _data_callback(snapshot);
         }
     }
 

@@ -38,7 +38,9 @@
 #include <pb_decode.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 #include "hal/gps/gps.h"
+#include "common_define.h"
 
 static const char* TAG = "MESH";
 
@@ -1085,6 +1087,47 @@ namespace Mesh
             return true;
         }
         return false;
+    }
+
+    void MeshService::setGps(HAL::GPS* gps)
+    {
+        if (_gps)
+        {
+            _gps->setDataCallback(nullptr);
+        }
+        _gps = gps;
+        if (_gps)
+        {
+            _gps->setDataCallback([this](const HAL::GpsData& data) { _onGpsData(data); });
+        }
+    }
+
+    void MeshService::_onGpsData(const HAL::GpsData& data)
+    {
+        if ((time_t)data.time <= BUILD_TIMESTAMP)
+        {
+            return;
+        }
+
+        time_t sys_now = 0;
+        time(&sys_now);
+        time_t drift = (time_t)data.time - sys_now;
+        if (drift < 0) drift = -drift;
+
+        if (!_hal->isGPSAdjusted() || drift > GPS_SIGNIFICANT_DRIFT_S)
+        {
+            struct timeval tv = {.tv_sec = (time_t)data.time, .tv_usec = 0};
+            settimeofday(&tv, nullptr);
+            if (!_hal->isGPSAdjusted())
+            {
+                _hal->playNotificationSound(HAL::Hal::NotificationSound::GPS);
+                _hal->setGPSAdjusted(true);
+            }
+            ESP_LOGI(TAG,
+                     "System time adjusted from GPS: %lu (drift: %llds)",
+                     (unsigned long)data.time,
+                     (long long)drift);
+        }
     }
 
     void MeshService::setMessageCallback(MessageCallback callback) { _message_callback = callback; }

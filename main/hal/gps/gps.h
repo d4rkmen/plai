@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "../board.h"
@@ -67,6 +68,12 @@ namespace HAL
 
         void clear() { memset(this, 0, sizeof(GpsData)); }
     };
+
+    /**
+     * @brief Callback invoked from the GPS background task whenever a new
+     *        complete fix is available (after each valid RMC sentence).
+     */
+    using DataCallback = std::function<void(const GpsData&)>;
 
     /**
      * @brief GPS driver for ATGM336H (NMEA over UART)
@@ -178,6 +185,13 @@ namespace HAL
         uint32_t msSinceLastFix() const;
 
         /**
+         * @brief Register a callback invoked on every new GPS fix (from the GPS task).
+         *        Pass nullptr to unregister. The callback receives a snapshot of GpsData.
+         * @param cb Callback function (or nullptr)
+         */
+        void setDataCallback(DataCallback cb);
+
+        /**
          * @brief Send a NMEA command to GPS module
          * @param cmd Command without $ prefix or *checksum suffix (e.g. "PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
          */
@@ -201,6 +215,9 @@ namespace HAL
 
         // GPS data (updated by background task)
         volatile GpsData _data;
+
+        // Optional callback fired after each valid RMC fix update
+        DataCallback _data_callback;
 
         // Background task
         static void _uart_task(void* arg);

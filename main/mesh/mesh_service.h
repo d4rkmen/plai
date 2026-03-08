@@ -232,10 +232,11 @@ namespace Mesh
         void setTraceRouteCallback(TraceRouteCallback callback) { _traceroute_callback = callback; }
 
         /**
-         * @brief Set GPS driver pointer (for live GPS position)
+         * @brief Set GPS driver pointer (for live GPS position and time sync).
+         *        Registers an internal data callback; pass nullptr to detach.
          * @param gps Pointer to GPS driver (may be nullptr)
          */
-        void setGps(HAL::GPS* gps) { _gps = gps; }
+        void setGps(HAL::GPS* gps);
 
         /**
          * @brief Set battery info callback (for device telemetry)
@@ -367,6 +368,9 @@ namespace Mesh
 
         // New-node greeting
         void sendNewNodeGreeting(uint32_t node_id, uint8_t channel, uint8_t hops, int16_t rssi, float snr);
+
+        // GPS data callback: adjusts system time on significant drift
+        void _onGpsData(const HAL::GpsData& data);
 
         // Region and modem state
         const RegionInfo* _my_region;
