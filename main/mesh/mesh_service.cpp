@@ -1664,26 +1664,29 @@ namespace Mesh
         handleMeshPacket(packet);
     }
 
-    bool MeshService::decodeMeshPacket(const meshtastic_MeshPacket& packet, meshtastic_MeshPacket& decoded) const
+    meshtastic_Routing_Error MeshService::decodeMeshPacket(const meshtastic_MeshPacket& packet,
+                                                             meshtastic_MeshPacket& decoded) const
     {
         decoded = packet;
 
         if (packet.which_payload_variant == meshtastic_MeshPacket_decoded_tag)
         {
-            return true;
+            return meshtastic_Routing_Error_NONE;
         }
 
         if (packet.which_payload_variant != meshtastic_MeshPacket_encrypted_tag)
         {
-            return false;
+            return meshtastic_Routing_Error_BAD_REQUEST;
         }
 
         if (packet.encrypted.size == 0)
         {
-            return false;
+            return meshtastic_Routing_Error_BAD_REQUEST;
         }
 
         // ---- PKC decryption attempt (channel==0, DM to us, sender has public key) ----
+        // Track why PKC failed so we can return the right error code when PSK also fails.
+        meshtastic_Routing_Error pkc_result = meshtastic_Routing_Error_NO_CHANNEL; // default = PKC not attempted
 #if MESH_HAS_MBEDTLS
         if (packet.channel == 0 && packet.to != 0xFFFFFFFF /*&& packet.to == _config.node_id */ &&
             packet.encrypted.size > PKC_OVERHEAD && _nodedb && _config.public_key_len == 32)
@@ -1700,6 +1703,7 @@ namespace Mesh
             if (!have_sender)
             {
                 ESP_LOGW(TAG, "PKC: peer 0x%08lX not in NodeDB, cannot decrypt", (unsigned long)peer_id);
+                pkc_result = meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY;
             }
             else if (!have_sender_key)
             {
@@ -1707,9 +1711,13 @@ namespace Mesh
                          "PKC: peer 0x%08lX has no public key (size=%u)",
                          (unsigned long)peer_id,
                          (unsigned)sender_node.info.user.public_key.size);
+                pkc_result = meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY;
             }
             else
             {
+                // We have the peer key — any further failure is a cryptographic mismatch
+                pkc_result = meshtastic_Routing_Error_PKI_FAILED;
+
                 ESP_LOGD(TAG,
                          "PKC: attempt decrypt from 0x%08lX (%u bytes)",
                          (unsigned long)packet.from,
@@ -1770,7 +1778,7 @@ namespace Mesh
                                          decoded_data.portnum);
                                 decoded.decoded = decoded_data;
                                 decoded.which_payload_variant = meshtastic_MeshPacket_decoded_tag;
-                                return true;
+                                return meshtastic_Routing_Error_NONE;
                             }
                             else
                             {
@@ -1802,7 +1810,7 @@ namespace Mesh
         if (payload_len > sizeof(plaintext))
         {
             ESP_LOGW(TAG, "Encrypted payload too large (%u bytes)", (unsigned int)payload_len);
-            return false;
+            return meshtastic_Routing_Error_TOO_LARGE;
         }
 
         uint8_t nonce_counter[16] = {};
@@ -2002,8 +2010,9 @@ namespace Mesh
         {
             if (packet.channel == 0 && packet.to != 0xFFFFFFFF)
             {
+                // Channel-0 DM must be PKC; propagate the specific PKC error to the caller.
                 ESP_LOGW(TAG, "PKC packet (ch=0) for 0x%08lX failed decryption", (unsigned long)packet.to);
-                return false;
+                return pkc_result; // PKI_UNKNOWN_PUBKEY or PKI_FAILED
             }
 
             uint8_t preset_key[32] = {};
@@ -2024,19 +2033,19 @@ namespace Mesh
         if (!decoded_ok)
         {
             ESP_LOGW(TAG, "Failed to decode packet (hash=0x%02X from=0x%08lX)", packet.channel, (unsigned long)packet.from);
-            return false;
+            return meshtastic_Routing_Error_NO_CHANNEL;
         }
 
         if (decoded_data.portnum == meshtastic_PortNum_UNKNOWN_APP)
         {
             ESP_LOGW(TAG, "Decoded payload has unknown port");
-            return false;
+            return meshtastic_Routing_Error_BAD_REQUEST;
         }
 
         decoded.which_payload_variant = meshtastic_MeshPacket_decoded_tag;
         decoded.decoded = decoded_data;
         decoded.channel = matched_channel_index;
-        return true;
+        return meshtastic_Routing_Error_NONE;
     }
 
     void MeshService::handleMeshPacket(const meshtastic_MeshPacket& packet)
@@ -2058,10 +2067,22 @@ namespace Mesh
             packet.relay_node);
 
         meshtastic_MeshPacket decoded_packet = meshtastic_MeshPacket_init_default;
-        bool decoded_ok = decodeMeshPacket(packet, decoded_packet);
+        meshtastic_Routing_Error decode_err = decodeMeshPacket(packet, decoded_packet);
+        bool decoded_ok = (decode_err == meshtastic_Routing_Error_NONE);
+
         if (!decoded_ok && packet.which_payload_variant == meshtastic_MeshPacket_encrypted_tag)
         {
             ESP_LOGW(TAG, "Encrypted payload received (%u bytes), unable to decrypt", packet.encrypted.size);
+
+            // For PKC-encrypted DMs directed at us, NACK the sender immediately so they know
+            // whether to retry with PSK or re-do key exchange, rather than waiting for timeout.
+            if (packet.to == _config.node_id && packet.want_ack &&
+                (decode_err == meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY ||
+                 decode_err == meshtastic_Routing_Error_PKI_FAILED))
+            {
+                uint8_t hop_limit = getHopLimitForResponse(packet.hop_start, packet.hop_limit);
+                sendRouting(packet.from, packet.id, packet.channel, hop_limit, decode_err);
+            }
         }
 
         // Log RX packet
@@ -4201,21 +4222,32 @@ namespace Mesh
         return _config.lora_config.hop_limit; // Default hop limit
     }
 
-    bool MeshService::sendAck(uint32_t to, uint32_t packet_id, uint8_t channel, uint8_t hop_limit)
+    bool MeshService::sendRouting(uint32_t to,
+                                   uint32_t packet_id,
+                                   uint8_t  channel,
+                                   uint8_t  hop_limit,
+                                   meshtastic_Routing_Error error_code)
     {
-        ESP_LOGI(TAG, "Sending ACK to 0x%08lX for packet 0x%08lX", (unsigned long)to, (unsigned long)packet_id);
+        const bool is_ack = (error_code == meshtastic_Routing_Error_NONE);
+        if (is_ack)
+            ESP_LOGI(TAG, "Sending ACK to 0x%08lX for packet 0x%08lX", (unsigned long)to, (unsigned long)packet_id);
+        else
+            ESP_LOGW(TAG,
+                     "Sending NACK to 0x%08lX for packet 0x%08lX (error=%d)",
+                     (unsigned long)to,
+                     (unsigned long)packet_id,
+                     (int)error_code);
 
-        // Create Routing message with error_reason = NONE (which is an ACK)
         meshtastic_Routing routing = meshtastic_Routing_init_default;
         routing.which_variant = meshtastic_Routing_error_reason_tag;
-        routing.error_reason = meshtastic_Routing_Error_NONE;
+        routing.error_reason = error_code;
 
         // Encode the Routing message
         uint8_t routing_buf[meshtastic_Routing_size];
         pb_ostream_t routing_stream = pb_ostream_from_buffer(routing_buf, sizeof(routing_buf));
         if (!pb_encode(&routing_stream, meshtastic_Routing_fields, &routing))
         {
-            ESP_LOGE(TAG, "Failed to encode Routing ACK: %s", PB_GET_ERROR(&routing_stream));
+            ESP_LOGE(TAG, "Failed to encode Routing reply: %s", PB_GET_ERROR(&routing_stream));
             return false;
         }
 
@@ -4232,20 +4264,20 @@ namespace Mesh
         pb_ostream_t data_stream = pb_ostream_from_buffer(data_buf, sizeof(data_buf));
         if (!pb_encode(&data_stream, meshtastic_Data_fields, &data))
         {
-            ESP_LOGE(TAG, "Failed to encode Data for ACK: %s", PB_GET_ERROR(&data_stream));
+            ESP_LOGE(TAG, "Failed to encode Data for routing reply: %s", PB_GET_ERROR(&data_stream));
             return false;
         }
 
         // Create mesh packet
-        meshtastic_MeshPacket ack_packet = meshtastic_MeshPacket_init_default;
-        ack_packet.from = _config.node_id;
-        ack_packet.to = to;
-        ack_packet.id = _router.generatePacketId();
-        ack_packet.channel = channel;
-        ack_packet.want_ack = false; // ACKs don't want ACKs back
-        ack_packet.hop_limit = hop_limit;
-        ack_packet.hop_start = hop_limit;
-        ack_packet.priority = meshtastic_MeshPacket_Priority_ACK;
+        meshtastic_MeshPacket rsp_packet = meshtastic_MeshPacket_init_default;
+        rsp_packet.from = _config.node_id;
+        rsp_packet.to = to;
+        rsp_packet.id = _router.generatePacketId();
+        rsp_packet.channel = channel;
+        rsp_packet.want_ack = false; // routing replies never want an ACK back
+        rsp_packet.hop_limit = hop_limit;
+        rsp_packet.hop_start = hop_limit;
+        rsp_packet.priority = meshtastic_MeshPacket_Priority_ACK;
 
         // Get channel key for encryption
         uint8_t key[32] = {};
@@ -4255,7 +4287,7 @@ namespace Mesh
 
         if (!expandChannelPsk(_config.primary_channel.settings, key, key_len, no_crypto))
         {
-            ESP_LOGE(TAG, "Failed to expand channel PSK for ACK");
+            ESP_LOGE(TAG, "Failed to expand channel PSK for routing reply");
             return false;
         }
         computeChannelHash(_config, key, key_len, channel_hash);
@@ -4273,39 +4305,39 @@ namespace Mesh
             if (mbedtls_aes_setkey_enc(&ctx, key, key_len * 8) != 0)
             {
                 mbedtls_aes_free(&ctx);
-                ESP_LOGE(TAG, "Failed to set AES key for ACK");
+                ESP_LOGE(TAG, "Failed to set AES key for routing reply");
                 return false;
             }
 
             uint8_t nonce[16] = {};
-            writeU64Le(nonce, (uint64_t)ack_packet.id);
-            writeU32Le(nonce + 8, ack_packet.from);
+            writeU64Le(nonce, (uint64_t)rsp_packet.id);
+            writeU32Le(nonce + 8, rsp_packet.from);
 
             size_t nc_off = 0;
             uint8_t stream_block[16] = {};
             if (mbedtls_aes_crypt_ctr(&ctx, encrypted_len, &nc_off, nonce, stream_block, data_buf, encrypted) != 0)
             {
                 mbedtls_aes_free(&ctx);
-                ESP_LOGE(TAG, "AES-CTR encrypt failed for ACK");
+                ESP_LOGE(TAG, "AES-CTR encrypt failed for routing reply");
                 return false;
             }
             mbedtls_aes_free(&ctx);
 #else
-            ESP_LOGE(TAG, "AES support not available for ACK");
+            ESP_LOGE(TAG, "AES support not available for routing reply");
             return false;
 #endif
         }
 
         // Build packet header
         PacketHeader header = {};
-        header.to = ack_packet.to;
-        header.from = ack_packet.from;
-        header.id = ack_packet.id;
+        header.to = rsp_packet.to;
+        header.from = rsp_packet.from;
+        header.id = rsp_packet.id;
         header.channel = channel_hash;
         header.next_hop = 0;
-        header.relay_node = (uint8_t)(ack_packet.from & 0xFFu);
-        header.flags = (ack_packet.hop_limit & PACKET_FLAGS_HOP_LIMIT_MASK) |
-                       ((ack_packet.hop_start << PACKET_FLAGS_HOP_START_SHIFT) & PACKET_FLAGS_HOP_START_MASK);
+        header.relay_node = (uint8_t)(rsp_packet.from & 0xFFu);
+        header.flags = (rsp_packet.hop_limit & PACKET_FLAGS_HOP_LIMIT_MASK) |
+                       ((rsp_packet.hop_start << PACKET_FLAGS_HOP_START_SHIFT) & PACKET_FLAGS_HOP_START_MASK);
 
         // Build final radio packet
         uint8_t radio_buf[MAX_LORA_PAYLOAD] = {};
@@ -4313,18 +4345,24 @@ namespace Mesh
         memcpy(radio_buf + sizeof(header), encrypted, encrypted_len);
         size_t radio_len = sizeof(header) + encrypted_len;
 
-        // Send with high priority (ACKs are time-sensitive)
+        // Send with high priority (routing replies are time-sensitive)
         if (_router.enqueueTxRaw(radio_buf, (uint8_t)radio_len, PacketPriority::ACK, meshtastic_PortNum_ROUTING_APP))
         {
-            ESP_LOGI(TAG, "ACK sent to 0x%08lX", (unsigned long)to);
+            ESP_LOGI(TAG, "Routing reply sent to 0x%08lX (error=%d)", (unsigned long)to, (int)error_code);
             return true;
         }
         else
         {
-            ESP_LOGW(TAG, "Failed to enqueue ACK");
+            ESP_LOGW(TAG, "Failed to enqueue routing reply");
             return false;
         }
     }
+
+    bool MeshService::sendAck(uint32_t to, uint32_t packet_id, uint8_t channel, uint8_t hop_limit)
+    {
+        return sendRouting(to, packet_id, channel, hop_limit, meshtastic_Routing_Error_NONE);
+    }
+
     static meshtastic_Config_DeviceConfig_Role roleFromName(const std::string& name)
     {
         // String values must exactly match getRoleName() and the settings option list

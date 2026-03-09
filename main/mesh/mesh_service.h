@@ -361,9 +361,20 @@ namespace Mesh
         void handlePositionPacket(const meshtastic_MeshPacket& packet);
         void handleTelemetryPacket(const meshtastic_MeshPacket& packet);
         void handleTraceRoutePacket(const meshtastic_MeshPacket& packet, float snr);
-        bool decodeMeshPacket(const meshtastic_MeshPacket& packet, meshtastic_MeshPacket& decoded) const;
+        /**
+         * @brief Attempt to decrypt and decode @p packet into @p decoded.
+         * @return meshtastic_Routing_Error_NONE on success; a specific error code otherwise.
+         *         Only PKI_FAILED and PKI_UNKNOWN_PUBKEY codes are meaningful to NACK back to the sender.
+         */
+        meshtastic_Routing_Error decodeMeshPacket(const meshtastic_MeshPacket& packet,
+                                                  meshtastic_MeshPacket& decoded) const;
 
-        // ACK handling
+        // ACK / NACK / Routing reply handling
+        bool sendRouting(uint32_t to,
+                         uint32_t packet_id,
+                         uint8_t  channel,
+                         uint8_t  hop_limit,
+                         meshtastic_Routing_Error error_code = meshtastic_Routing_Error_NONE);
         bool sendAck(uint32_t to, uint32_t packet_id, uint8_t channel, uint8_t hop_limit);
         uint8_t getHopLimitForResponse(uint8_t hop_start, uint8_t hop_limit) const;
 
