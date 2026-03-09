@@ -3634,7 +3634,7 @@ namespace Mesh
         return false;
     }
 
-    bool MeshService::sendPosition(uint32_t dest, uint8_t channel)
+    bool MeshService::sendPosition(uint32_t dest, uint8_t channel, bool want_response)
     {
         meshtastic_Position position = meshtastic_Position_init_default;
         bool has_position = false;
@@ -3752,7 +3752,7 @@ namespace Mesh
         data.portnum = meshtastic_PortNum_POSITION_APP;
         data.payload.size = pos_stream.bytes_written;
         memcpy(data.payload.bytes, pos_buf, data.payload.size);
-        data.want_response = false;
+        data.want_response = want_response;
 
         uint8_t data_buf[MAX_LORA_PAYLOAD] = {};
         pb_ostream_t data_stream = pb_ostream_from_buffer(data_buf, sizeof(data_buf));

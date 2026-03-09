@@ -298,6 +298,22 @@ namespace Mesh
         PacketRouter& getRouter() { return _router; }
 
         /**
+         * @brief Send our NodeInfo to a specific destination node.
+         * @param dest       Destination node ID (0xFFFFFFFF for broadcast)
+         * @param channel    Channel index to use
+         * @param want_response Request the recipient to send their NodeInfo back
+         */
+        void sendNodeInfo(uint32_t dest, uint8_t channel, bool want_response = false);
+
+        /**
+         * @brief Send our position to a specific destination node.
+         * @param dest    Destination node ID
+         * @param channel Channel index to use
+         * @return true if position was available and packet was enqueued
+         */
+        bool sendPosition(uint32_t dest, uint8_t channel, bool want_response = false);
+
+        /**
          * @brief Send a traceroute request to a node
          * @param dest Destination node ID
          * @param channel Channel index
@@ -358,10 +374,6 @@ namespace Mesh
 
         // NodeInfo broadcast and reply
         void broadcastNodeInfo();
-        void sendNodeInfo(uint32_t dest, uint8_t channel, bool want_response = false);
-
-        // Position reply
-        bool sendPosition(uint32_t dest, uint8_t channel);
 
         // Device telemetry broadcast
         bool sendDeviceTelemetry(uint32_t dest = 0xFFFFFFFF, uint8_t channel = 0);

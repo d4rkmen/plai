@@ -31,7 +31,7 @@
 
 static const char* TAG = "APP_NODES";
 
-static const char* HINT_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [1..8][F.T.R] [ENT][DEL] [ESC]";
+static const char* HINT_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [1..8.F.T.R.N.P][ENT][DEL][ESC]";
 static const char* HINT_LIST_FN = "[\u2191]HOME [\u2193]END [T]RACE";
 static const char* HINT_DM = "[Fn] [^] [\u2191][\u2193][\u2190][\u2192] [I] [ENTER][DEL] [ESC]";
 static const char* HINT_DM_FN = "[\u2191]HOME [\u2193]END";
@@ -1267,7 +1267,6 @@ static const char* _hw_model_name(meshtastic_HardwareModel model)
     }
 }
 
-
 bool AppNodes::_render_node_detail()
 {
     if (!_data.update_list)
@@ -1313,7 +1312,7 @@ bool AppNodes::_render_node_detail()
     canvas->drawString(_format_node_id(node.info.num).c_str(), val_x, y);
     // Role on the right
     canvas->setTextColor(TFT_CYAN, THEME_COLOR_BG);
-        canvas->drawRightString(Mesh::NodeDB::getRoleName(user.role), canvas->width() - 4, y);
+    canvas->drawRightString(Mesh::NodeDB::getRoleName(user.role), canvas->width() - 4, y);
     y += rh;
 
     // Row: HW model + favorite
@@ -1887,6 +1886,79 @@ void AppNodes::_handle_node_list_input()
                         scroll_text_reset(&_data.name_scroll_ctx);
                         _data.update_list = true;
                     }
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_N))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_N);
+
+            if (_data.total_node_count > 0 && _data.hal->mesh() && _data.hal->nodedb())
+            {
+                Mesh::NodeInfo node;
+                if (_data.hal->nodedb()->getNodeByIndex(_data.selected_index, node))
+                {
+                    std::string name = node.info.user.long_name[0]    ? node.info.user.long_name
+                                       : node.info.user.short_name[0] ? node.info.user.short_name
+                                                                      : std::format("{:04x}", node.info.num & 0xFFFF);
+                    std::string title = std::format("Exchange with {}", name);
+                    if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "node information", "Send", "Cancel"))
+                    {
+                        _data.hal->mesh()->sendNodeInfo(node.info.num, node.info.channel, true);
+                    }
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_P))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_P);
+
+            if (_data.total_node_count > 0 && _data.hal->mesh() && _data.hal->nodedb())
+            {
+                Mesh::NodeInfo node;
+                if (_data.hal->nodedb()->getNodeByIndex(_data.selected_index, node))
+                {
+                    const auto& cfg = _data.hal->mesh()->getConfig();
+                    std::string pos_info;
+                    if (cfg.position == Mesh::MeshConfig::POSITION_OFF)
+                    {
+                        UTILS::UI::show_error_dialog(_data.hal,
+                                                     "Exchange position",
+                                                     "Position sharing is disabled in settings.");
+                        _data.update_list = true;
+                        return;
+                    }
+                    else if (cfg.position == Mesh::MeshConfig::POSITION_FIXED)
+                    {
+                        char buf[64];
+                        snprintf(buf,
+                                 sizeof(buf),
+                                 "Fixed position: %.5f, %.5f, %ldm",
+                                 cfg.fixed_latitude * 1e-7,
+                                 cfg.fixed_longitude * 1e-7,
+                                 cfg.fixed_altitude);
+                        pos_info = buf;
+                    }
+                    else // POSITION_GPS
+                    {
+                        pos_info = "Live GPS position";
+                    }
+
+                    std::string name = node.info.user.long_name[0]    ? node.info.user.long_name
+                                       : node.info.user.short_name[0] ? node.info.user.short_name
+                                                                      : std::format("{:04x}", node.info.num & 0xFFFF);
+                    std::string title = std::format("Exchange with {}", name);
+                    if (UTILS::UI::show_confirmation_dialog(_data.hal, title, pos_info, "Send", "Cancel"))
+                    {
+                        if (!_data.hal->mesh()->sendPosition(node.info.num, node.info.channel, true))
+                        {
+                            UTILS::UI::show_error_dialog(_data.hal, "Exchange position", "Failed to send position");
+                        }
+                    }
+                    _data.update_list = true;
                 }
             }
         }
