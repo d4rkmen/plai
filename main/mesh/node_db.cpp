@@ -409,34 +409,60 @@ namespace Mesh
         return nullptr;
     }
 
+    std::string NodeDB::getLongLabel(const NodeInfo& node)
+    {
+        if (!node.info.has_user)
+        {
+            return std::format("!{:08x}", node.info.num);
+        }
+        if (node.info.user.long_name[0])
+        {
+            return node.info.user.long_name;
+        }
+        return getLabel(node);
+    }
+
     std::string NodeDB::getLabel(const NodeInfo& node)
     {
-        std::string label = node.info.user.short_name;
-        if (label.empty())
+        if (node.info.user.short_name[0])
         {
-            label = std::format("{:04x}", node.info.num & 0xFFFF);
+            return node.info.user.short_name;
         }
-        return label;
+        return std::format("{:04x}", node.info.num & 0xFFFF);
     }
 
     const char* NodeDB::getRoleName(meshtastic_Config_DeviceConfig_Role role)
     {
         switch (role)
         {
-        case meshtastic_Config_DeviceConfig_Role_CLIENT:        return "Client";
-        case meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE:   return "Client Mute";
-        case meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN: return "Client Hidden";
-        case meshtastic_Config_DeviceConfig_Role_CLIENT_BASE:   return "Client Base";
-        case meshtastic_Config_DeviceConfig_Role_ROUTER:        return "Router";
-        case meshtastic_Config_DeviceConfig_Role_ROUTER_CLIENT: return "Router Client";
-        case meshtastic_Config_DeviceConfig_Role_ROUTER_LATE:   return "Router Late";
-        case meshtastic_Config_DeviceConfig_Role_REPEATER:      return "Repeater";
-        case meshtastic_Config_DeviceConfig_Role_TRACKER:       return "Tracker";
-        case meshtastic_Config_DeviceConfig_Role_SENSOR:        return "Sensor";
-        case meshtastic_Config_DeviceConfig_Role_TAK:           return "TAK";
-        case meshtastic_Config_DeviceConfig_Role_TAK_TRACKER:   return "TAK Tracker";
-        case meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND: return "Lost&Found";
-        default:                                                return "Unknown";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT:
+            return "Client";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE:
+            return "Client Mute";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN:
+            return "Client Hidden";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT_BASE:
+            return "Client Base";
+        case meshtastic_Config_DeviceConfig_Role_ROUTER:
+            return "Router";
+        case meshtastic_Config_DeviceConfig_Role_ROUTER_CLIENT:
+            return "Router Client";
+        case meshtastic_Config_DeviceConfig_Role_ROUTER_LATE:
+            return "Router Late";
+        case meshtastic_Config_DeviceConfig_Role_REPEATER:
+            return "Repeater";
+        case meshtastic_Config_DeviceConfig_Role_TRACKER:
+            return "Tracker";
+        case meshtastic_Config_DeviceConfig_Role_SENSOR:
+            return "Sensor";
+        case meshtastic_Config_DeviceConfig_Role_TAK:
+            return "TAK";
+        case meshtastic_Config_DeviceConfig_Role_TAK_TRACKER:
+            return "TAK Tracker";
+        case meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND:
+            return "Lost&Found";
+        default:
+            return "Unknown";
         }
     }
 

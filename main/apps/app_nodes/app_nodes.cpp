@@ -635,11 +635,7 @@ bool AppNodes::_render_node_list()
         }
 
         // 4. Long name (scrolling handled separately for selected item)
-        std::string display_name = node.info.user.long_name;
-        if (display_name.empty())
-        {
-            display_name = _format_node_id(node.info.num);
-        }
+        std::string display_name = Mesh::NodeDB::getLongLabel(node);
         if (is_selected)
         {
             // Cache display name for scrolling text renderer
@@ -1671,20 +1667,13 @@ void AppNodes::_handle_node_list_input()
             if (_data.selected_node_valid)
             {
                 _data.selected_node_id = _data.selected_node.info.num;
-                std::string name = _data.selected_node.info.user.long_name;
-                if (name.empty())
-                {
-                    name = _data.selected_node.info.user.short_name;
-                    if (name.empty())
-                    {
-                        name = std::format("!{:08x}", _data.selected_node_id);
-                    }
-                }
+                std::string name = Mesh::NodeDB::getLongLabel(_data.selected_node);
                 if (UTILS::UI::show_confirmation_dialog(_data.hal, name, "Delete node?", "Delete", "Cancel"))
                 {
                     if (!_data.hal->nodedb()->removeNode(_data.selected_node_id))
                     {
-                        std::string error_message = std::format("to delete {}", _data.selected_node.info.user.long_name);
+                        std::string error_message =
+                            std::format("to delete {}", Mesh::NodeDB::getLongLabel(_data.selected_node));
                         UTILS::UI::show_error_dialog(_data.hal, "Failed", error_message);
                     }
                 }
@@ -1899,9 +1888,7 @@ void AppNodes::_handle_node_list_input()
                 Mesh::NodeInfo node;
                 if (_data.hal->nodedb()->getNodeByIndex(_data.selected_index, node))
                 {
-                    std::string title = node.info.user.long_name[0]    ? node.info.user.long_name
-                                        : node.info.user.short_name[0] ? node.info.user.short_name
-                                                                       : std::format("{:04x}", node.info.num & 0xFFFF);
+                    std::string title = Mesh::NodeDB::getLongLabel(node);
                     if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "Exchange node information?", "Send", "Cancel"))
                     {
                         _data.hal->mesh()->sendNodeInfo(node.info.num, node.info.channel, true);
@@ -1946,9 +1933,7 @@ void AppNodes::_handle_node_list_input()
                         pos_info = "Live GPS position";
                     }
 
-                    std::string title = node.info.user.long_name[0]    ? node.info.user.long_name
-                                       : node.info.user.short_name[0] ? node.info.user.short_name
-                                                                      : std::format("{:04x}", node.info.num & 0xFFFF);
+                    std::string title = Mesh::NodeDB::getLongLabel(node);
                     if (UTILS::UI::show_confirmation_dialog(_data.hal, title, pos_info, "Send", "Cancel"))
                     {
                         if (!_data.hal->mesh()->sendPosition(node.info.num, node.info.channel, true))
@@ -2079,7 +2064,7 @@ void AppNodes::_handle_dm_input()
             _data.hal->keyboard()->waitForRelease(KEY_NUM_BACKSPACE);
             // clear all messages
             if (UTILS::UI::show_confirmation_dialog(_data.hal,
-                                                    _data.selected_node.info.user.long_name,
+                                                    Mesh::NodeDB::getLongLabel(_data.selected_node),
                                                     "Clear chat?",
                                                     "Clear",
                                                     "Cancel"))
@@ -2096,7 +2081,7 @@ void AppNodes::_handle_dm_input()
 
             // Open text input dialog (max 200 bytes)
             std::string message_text;
-            std::string title = std::format("Message to: {}", _data.selected_node.info.user.long_name);
+            std::string title = std::format("Message to: {}", Mesh::NodeDB::getLongLabel(_data.selected_node));
             if (UTILS::UI::show_edit_string_dialog(_data.hal, title, message_text, false, 200))
             {
                 if (!message_text.empty())

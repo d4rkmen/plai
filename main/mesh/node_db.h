@@ -137,6 +137,14 @@ namespace Mesh
         static std::string getLabel(const NodeInfo& node);
 
         /**
+         * @brief Get a display label for a node: long_name if set, otherwise short_name if set, otherwise lower-16-bit hex,
+         *        truncated to 4 UTF-8 characters.
+         * @param node Node to derive the label from
+         * @return Display label string
+         */
+        static std::string getLongLabel(const NodeInfo& node);
+
+        /**
          * @brief Human-readable name for a device role enum value.
          * @param role Role enum from meshtastic_Config_DeviceConfig_Role
          * @return Short display string (e.g. "Router", "Tracker")
