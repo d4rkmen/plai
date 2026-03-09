@@ -1665,7 +1665,7 @@ namespace Mesh
     }
 
     meshtastic_Routing_Error MeshService::decodeMeshPacket(const meshtastic_MeshPacket& packet,
-                                                             meshtastic_MeshPacket& decoded) const
+                                                           meshtastic_MeshPacket& decoded) const
     {
         decoded = packet;
 
@@ -3436,7 +3436,7 @@ namespace Mesh
     uint32_t MeshService::generateNodeId()
     {
         uint8_t mac[6];
-        esp_read_mac(mac, ESP_MAC_BT);
+        esp_efuse_mac_get_default(mac);
 
         // Create node ID from last 4 bytes of MAC
         uint32_t node_id = ((uint32_t)mac[2] << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | ((uint32_t)mac[5]);
@@ -3473,8 +3473,7 @@ namespace Mesh
         user.role = _config.role;
         // Convert node ID to hex string for id field
         snprintf(user.id, sizeof(user.id), "!%08lx", (unsigned long)_config.node_id);
-        // BLE MAC addr
-        esp_read_mac(user.macaddr, ESP_MAC_BT);
+        esp_efuse_mac_get_default(user.macaddr);
         // Public key
         if (_config.public_key_len == 32)
         {
@@ -3636,7 +3635,7 @@ namespace Mesh
             snprintf(out.info.user.id, sizeof(out.info.user.id), "!%08lx", (unsigned long)_config.node_id);
             out.info.user.hw_model = meshtastic_HardwareModel_M5STACK_CARDPUTER_ADV;
             out.info.user.role = _config.role;
-            esp_read_mac(out.info.user.macaddr, ESP_MAC_BT);
+            esp_efuse_mac_get_default(out.info.user.macaddr);
             if (_config.public_key_len == 32)
             {
                 memcpy(out.info.user.public_key.bytes, _config.public_key, 32);
@@ -4222,11 +4221,8 @@ namespace Mesh
         return _config.lora_config.hop_limit; // Default hop limit
     }
 
-    bool MeshService::sendRouting(uint32_t to,
-                                   uint32_t packet_id,
-                                   uint8_t  channel,
-                                   uint8_t  hop_limit,
-                                   meshtastic_Routing_Error error_code)
+    bool MeshService::sendRouting(
+        uint32_t to, uint32_t packet_id, uint8_t channel, uint8_t hop_limit, meshtastic_Routing_Error error_code)
     {
         const bool is_ack = (error_code == meshtastic_Routing_Error_NONE);
         if (is_ack)
