@@ -1899,11 +1899,10 @@ void AppNodes::_handle_node_list_input()
                 Mesh::NodeInfo node;
                 if (_data.hal->nodedb()->getNodeByIndex(_data.selected_index, node))
                 {
-                    std::string name = node.info.user.long_name[0]    ? node.info.user.long_name
-                                       : node.info.user.short_name[0] ? node.info.user.short_name
-                                                                      : std::format("{:04x}", node.info.num & 0xFFFF);
-                    std::string title = std::format("Exchange with {}", name);
-                    if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "node information", "Send", "Cancel"))
+                    std::string title = node.info.user.long_name[0]    ? node.info.user.long_name
+                                        : node.info.user.short_name[0] ? node.info.user.short_name
+                                                                       : std::format("{:04x}", node.info.num & 0xFFFF);
+                    if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "Exchange node information?", "Send", "Cancel"))
                     {
                         _data.hal->mesh()->sendNodeInfo(node.info.num, node.info.channel, true);
                     }
@@ -1927,7 +1926,7 @@ void AppNodes::_handle_node_list_input()
                     {
                         UTILS::UI::show_error_dialog(_data.hal,
                                                      "Exchange position",
-                                                     "Position sharing is disabled in settings.");
+                                                     "Position sharing is disabled in settings");
                         _data.update_list = true;
                         return;
                     }
@@ -1947,10 +1946,9 @@ void AppNodes::_handle_node_list_input()
                         pos_info = "Live GPS position";
                     }
 
-                    std::string name = node.info.user.long_name[0]    ? node.info.user.long_name
+                    std::string title = node.info.user.long_name[0]    ? node.info.user.long_name
                                        : node.info.user.short_name[0] ? node.info.user.short_name
                                                                       : std::format("{:04x}", node.info.num & 0xFFFF);
-                    std::string title = std::format("Exchange with {}", name);
                     if (UTILS::UI::show_confirmation_dialog(_data.hal, title, pos_info, "Send", "Cancel"))
                     {
                         if (!_data.hal->mesh()->sendPosition(node.info.num, node.info.channel, true))
