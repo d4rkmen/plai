@@ -2087,8 +2087,8 @@ namespace Mesh
             {
                 le.request_id = decoded_packet.decoded.request_id;
                 meshtastic_Routing routing = meshtastic_Routing_init_default;
-                pb_istream_t r_stream = pb_istream_from_buffer(decoded_packet.decoded.payload.bytes,
-                                                               decoded_packet.decoded.payload.size);
+                pb_istream_t r_stream =
+                    pb_istream_from_buffer(decoded_packet.decoded.payload.bytes, decoded_packet.decoded.payload.size);
                 if (pb_decode(&r_stream, meshtastic_Routing_fields, &routing) &&
                     routing.which_variant == meshtastic_Routing_error_reason_tag)
                 {
@@ -4328,19 +4328,32 @@ namespace Mesh
     static meshtastic_Config_DeviceConfig_Role roleFromName(const std::string& name)
     {
         // String values must exactly match getRoleName() and the settings option list
-        if (name == "Client")        return meshtastic_Config_DeviceConfig_Role_CLIENT;
-        if (name == "Client Mute")   return meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE;
-        if (name == "Client Hidden") return meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN;
-        if (name == "Client Base")   return meshtastic_Config_DeviceConfig_Role_CLIENT_BASE;
-        if (name == "Router")        return meshtastic_Config_DeviceConfig_Role_ROUTER;
-        if (name == "Router Client") return meshtastic_Config_DeviceConfig_Role_ROUTER_CLIENT;
-        if (name == "Router Late")   return meshtastic_Config_DeviceConfig_Role_ROUTER_LATE;
-        if (name == "Repeater")      return meshtastic_Config_DeviceConfig_Role_REPEATER;
-        if (name == "Tracker")       return meshtastic_Config_DeviceConfig_Role_TRACKER;
-        if (name == "Sensor")        return meshtastic_Config_DeviceConfig_Role_SENSOR;
-        if (name == "TAK")           return meshtastic_Config_DeviceConfig_Role_TAK;
-        if (name == "TAK Tracker")   return meshtastic_Config_DeviceConfig_Role_TAK_TRACKER;
-        if (name == "Lost&Found")    return meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND;
+        if (name == "Client")
+            return meshtastic_Config_DeviceConfig_Role_CLIENT;
+        if (name == "Client Mute")
+            return meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE;
+        if (name == "Client Hidden")
+            return meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN;
+        if (name == "Client Base")
+            return meshtastic_Config_DeviceConfig_Role_CLIENT_BASE;
+        if (name == "Router")
+            return meshtastic_Config_DeviceConfig_Role_ROUTER;
+        if (name == "Router Client")
+            return meshtastic_Config_DeviceConfig_Role_ROUTER_CLIENT;
+        if (name == "Router Late")
+            return meshtastic_Config_DeviceConfig_Role_ROUTER_LATE;
+        if (name == "Repeater")
+            return meshtastic_Config_DeviceConfig_Role_REPEATER;
+        if (name == "Tracker")
+            return meshtastic_Config_DeviceConfig_Role_TRACKER;
+        if (name == "Sensor")
+            return meshtastic_Config_DeviceConfig_Role_SENSOR;
+        if (name == "TAK")
+            return meshtastic_Config_DeviceConfig_Role_TAK;
+        if (name == "TAK Tracker")
+            return meshtastic_Config_DeviceConfig_Role_TAK_TRACKER;
+        if (name == "Lost&Found")
+            return meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND;
         return meshtastic_Config_DeviceConfig_Role_CLIENT;
     }
 

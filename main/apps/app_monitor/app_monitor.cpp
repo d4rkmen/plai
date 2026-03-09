@@ -740,32 +740,40 @@ bool AppMonitor::_render_packet_detail()
         {
             add_header("ROUTING");
             bool is_ack = (pkt.routing_error == 0);
-            add_row("Type", is_ack ? "ACK" : "NACK",
-                    lgfx::v1::convert_to_rgb888(is_ack ? TFT_GREEN : TFT_RED));
+            add_row("Type", is_ack ? "ACK" : "NACK", lgfx::v1::convert_to_rgb888(is_ack ? TFT_GREEN : TFT_RED));
             if (!is_ack)
             {
-                static const struct { uint8_t code; const char* name; } routing_errors[] = {
-                    {1,  "NO_ROUTE"},
-                    {2,  "GOT_NAK"},
-                    {3,  "TIMEOUT"},
-                    {4,  "NO_IFACE"},
-                    {5,  "MAX_RETRY"},
-                    {6,  "NO_CHAN"},
-                    {7,  "TOO_LARGE"},
-                    {8,  "NO_RESP"},
-                    {9,  "DUTY_LIM"},
-                    {32, "BAD_REQ"},
-                    {33, "UNAUTH"},
-                    {34, "PKI_FAIL"},
-                    {35, "NO_KEY"},
-                    {36, "BAD_SESS"},
-                    {37, "KEY_UNAUTH"},
-                    {38, "RATE_LIM"},
-                    {39, "PKI_SEND"},
+                static const struct
+                {
+                    uint8_t code;
+                    const char* name;
+                } routing_errors[] = {
+                    {meshtastic_Routing_Error_NONE, "NONE"},
+                    {meshtastic_Routing_Error_NO_ROUTE, "NO_ROUTE"},
+                    {meshtastic_Routing_Error_GOT_NAK, "GOT_NAK"},
+                    {meshtastic_Routing_Error_TIMEOUT, "TIMEOUT"},
+                    {meshtastic_Routing_Error_NO_INTERFACE, "NO_IFACE"},
+                    {meshtastic_Routing_Error_MAX_RETRANSMIT, "MAX_RETRY"},
+                    {meshtastic_Routing_Error_NO_CHANNEL, "NO_CHAN"},
+                    {meshtastic_Routing_Error_TOO_LARGE, "TOO_LARGE"},
+                    {meshtastic_Routing_Error_NO_RESPONSE, "NO_RESP"},
+                    {meshtastic_Routing_Error_DUTY_CYCLE_LIMIT, "DUTY_LIM"},
+                    {meshtastic_Routing_Error_BAD_REQUEST, "BAD_REQ"},
+                    {meshtastic_Routing_Error_NOT_AUTHORIZED, "UNAUTH"},
+                    {meshtastic_Routing_Error_PKI_FAILED, "PKI_FAIL"},
+                    {meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY, "NO_KEY"},
+                    {meshtastic_Routing_Error_ADMIN_BAD_SESSION_KEY, "BAD_SESS"},
+                    {meshtastic_Routing_Error_ADMIN_PUBLIC_KEY_UNAUTHORIZED, "KEY_UNAUTH"},
+                    {meshtastic_Routing_Error_RATE_LIMIT_EXCEEDED, "RATE_LIM"},
+                    {meshtastic_Routing_Error_PKI_SEND_FAIL_PUBLIC_KEY, "PKI_SEND"},
                 };
                 const char* err_name = nullptr;
                 for (const auto& e : routing_errors)
-                    if (e.code == pkt.routing_error) { err_name = e.name; break; }
+                    if (e.code == pkt.routing_error)
+                    {
+                        err_name = e.name;
+                        break;
+                    }
                 char ebuf[16];
                 if (err_name)
                     snprintf(ebuf, sizeof(ebuf), "%s", err_name);
