@@ -2083,6 +2083,18 @@ namespace Mesh
             le.is_tx = false;
             le.decoded = decoded_ok;
             le.port = decoded_ok ? decoded_packet.decoded.portnum : 0;
+            if (decoded_ok && decoded_packet.decoded.portnum == meshtastic_PortNum_ROUTING_APP)
+            {
+                le.request_id = decoded_packet.decoded.request_id;
+                meshtastic_Routing routing = meshtastic_Routing_init_default;
+                pb_istream_t r_stream = pb_istream_from_buffer(decoded_packet.decoded.payload.bytes,
+                                                               decoded_packet.decoded.payload.size);
+                if (pb_decode(&r_stream, meshtastic_Routing_fields, &routing) &&
+                    routing.which_variant == meshtastic_Routing_error_reason_tag)
+                {
+                    le.routing_error = (uint8_t)routing.error_reason;
+                }
+            }
             MeshDataStore::getInstance().addPacketLogEntry(le);
         }
 

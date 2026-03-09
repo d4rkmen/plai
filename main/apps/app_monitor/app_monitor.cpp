@@ -739,7 +739,46 @@ bool AppMonitor::_render_packet_detail()
         case meshtastic_PortNum_ROUTING_APP:
         {
             add_header("ROUTING");
-            add_row("Type", "ACK / NACK", lgfx::v1::convert_to_rgb888(TFT_YELLOW));
+            bool is_ack = (pkt.routing_error == 0);
+            add_row("Type", is_ack ? "ACK" : "NACK",
+                    lgfx::v1::convert_to_rgb888(is_ack ? TFT_GREEN : TFT_RED));
+            if (!is_ack)
+            {
+                static const struct { uint8_t code; const char* name; } routing_errors[] = {
+                    {1,  "NO_ROUTE"},
+                    {2,  "GOT_NAK"},
+                    {3,  "TIMEOUT"},
+                    {4,  "NO_IFACE"},
+                    {5,  "MAX_RETRY"},
+                    {6,  "NO_CHAN"},
+                    {7,  "TOO_LARGE"},
+                    {8,  "NO_RESP"},
+                    {9,  "DUTY_LIM"},
+                    {32, "BAD_REQ"},
+                    {33, "UNAUTH"},
+                    {34, "PKI_FAIL"},
+                    {35, "NO_KEY"},
+                    {36, "BAD_SESS"},
+                    {37, "KEY_UNAUTH"},
+                    {38, "RATE_LIM"},
+                    {39, "PKI_SEND"},
+                };
+                const char* err_name = nullptr;
+                for (const auto& e : routing_errors)
+                    if (e.code == pkt.routing_error) { err_name = e.name; break; }
+                char ebuf[16];
+                if (err_name)
+                    snprintf(ebuf, sizeof(ebuf), "%s", err_name);
+                else
+                    snprintf(ebuf, sizeof(ebuf), "ERR_%u", (unsigned)pkt.routing_error);
+                add_row("Error", ebuf, lgfx::v1::convert_to_rgb888(TFT_RED));
+            }
+            if (pkt.request_id != 0)
+            {
+                char rbuf[12];
+                snprintf(rbuf, sizeof(rbuf), "0x%08lx", (unsigned long)pkt.request_id);
+                add_row("For", rbuf, lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            }
             break;
         }
         case meshtastic_PortNum_TRACEROUTE_APP:

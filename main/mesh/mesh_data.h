@@ -156,6 +156,8 @@ namespace Mesh
         uint8_t hop_start;     // Original hop start
         uint8_t channel;       // Channel hash
         uint8_t rx_snr_raw;    // Raw SNR from radio * 4 (RX only)
+        uint32_t request_id;   // For ROUTING_APP: ID of the packet being ACKed/NACKed (0 otherwise)
+        uint8_t routing_error; // For ROUTING_APP: meshtastic_Routing_Error value (0 = ACK/NONE)
         bool is_tx;            // true = TX, false = RX
         bool decoded;          // true if payload was successfully decoded
         bool want_ack;         // Want ACK flag
