@@ -1597,7 +1597,14 @@ bool AppNodes::_render_dm_view()
                     else
                     {
                         canvas->fillRoundRect(2, y + 1, name_col_width, DM_ITEM_HEIGHT, 3, sender_bg);
-                        canvas->drawString(sender_name, 2 + 3, y + 1);
+                        if (is_ours)
+                        {
+                            canvas->drawString(sender_name, 2 + 3, y + 1);
+                        }
+                        else
+                        {
+                            canvas->drawCenterString(sender_name, 2 + name_col_width / 2, y + 1);
+                        }
 
                         // Draw delivery status indicator
                         if (is_ours)

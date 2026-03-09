@@ -279,9 +279,6 @@ uint32_t AppChannels::_get_node_text_color(uint32_t node_id) { return UTILS::UI:
 
 std::string AppChannels::_get_sender_name(uint32_t node_id)
 {
-    if (_data.hal->mesh() && node_id == _data.hal->mesh()->getNodeId())
-        return "Me";
-
     if (_data.hal->nodedb())
     {
 
@@ -999,7 +996,7 @@ bool AppChannels::_render_channel_chat()
             bool is_ours = (msg.from == our_id);
             uint32_t sender_bg = _get_node_color(msg.from);
             uint32_t sender_fg = _get_node_text_color(msg.from);
-            std::string sender_name = _get_sender_name(msg.from);
+            std::string sender_name = is_ours ? "Me" : _get_sender_name(msg.from);
 
             for (size_t line_idx = 0; line_idx < wrapped.size(); line_idx++)
             {
@@ -1027,7 +1024,14 @@ bool AppChannels::_render_channel_chat()
                     else
                     {
                         canvas->fillRoundRect(2, y + 1, name_col_width, CHAT_ITEM_HEIGHT, 3, sender_bg);
-                        canvas->drawString(sender_name.c_str(), 2 + 3, y + 1);
+                        if (is_ours)
+                        {
+                            canvas->drawString(sender_name.c_str(), 2 + 3, y + 1);
+                        }
+                        else
+                        {
+                            canvas->drawCenterString(sender_name.c_str(), 2 + name_col_width / 2, y + 1);
+                        }
 
                         // Delivery status indicator for our messages
                         if (is_ours)
