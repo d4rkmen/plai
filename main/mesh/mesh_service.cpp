@@ -1112,7 +1112,8 @@ namespace Mesh
         time_t sys_now = 0;
         time(&sys_now);
         time_t drift = (time_t)data.time - sys_now;
-        if (drift < 0) drift = -drift;
+        if (drift < 0)
+            drift = -drift;
 
         if (!_hal->isGPSAdjusted() || drift > GPS_SIGNIFICANT_DRIFT_S)
         {
@@ -1123,10 +1124,7 @@ namespace Mesh
                 _hal->playNotificationSound(HAL::Hal::NotificationSound::GPS);
                 _hal->setGPSAdjusted(true);
             }
-            ESP_LOGI(TAG,
-                     "System time adjusted from GPS: %lu (drift: %llds)",
-                     (unsigned long)data.time,
-                     (long long)drift);
+            ESP_LOGI(TAG, "System time adjusted from GPS: %lu (drift: %llds)", (unsigned long)data.time, (long long)drift);
         }
     }
 
@@ -3599,6 +3597,7 @@ namespace Mesh
         {
             out = {};
             out.info.num = _config.node_id;
+            out.info.has_user = true;
             strncpy(out.info.user.short_name, _config.short_name, sizeof(out.info.user.short_name) - 1);
             strncpy(out.info.user.long_name, _config.long_name, sizeof(out.info.user.long_name) - 1);
             snprintf(out.info.user.id, sizeof(out.info.user.id), "!%08lx", (unsigned long)_config.node_id);
@@ -4316,24 +4315,20 @@ namespace Mesh
     }
     static meshtastic_Config_DeviceConfig_Role roleFromName(const std::string& name)
     {
-        if (name == "Client Mute")
-            return meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE;
-        if (name == "Client Hidden")
-            return meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN;
-        if (name == "Router")
-            return meshtastic_Config_DeviceConfig_Role_ROUTER;
-        if (name == "Repeater")
-            return meshtastic_Config_DeviceConfig_Role_REPEATER;
-        if (name == "Tracker")
-            return meshtastic_Config_DeviceConfig_Role_TRACKER;
-        if (name == "Sensor")
-            return meshtastic_Config_DeviceConfig_Role_SENSOR;
-        if (name == "TAK")
-            return meshtastic_Config_DeviceConfig_Role_TAK;
-        if (name == "TAK Tracker")
-            return meshtastic_Config_DeviceConfig_Role_TAK_TRACKER;
-        if (name == "Lost+Found")
-            return meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND;
+        // String values must exactly match getRoleName() and the settings option list
+        if (name == "Client")        return meshtastic_Config_DeviceConfig_Role_CLIENT;
+        if (name == "Client Mute")   return meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE;
+        if (name == "Client Hidden") return meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN;
+        if (name == "Client Base")   return meshtastic_Config_DeviceConfig_Role_CLIENT_BASE;
+        if (name == "Router")        return meshtastic_Config_DeviceConfig_Role_ROUTER;
+        if (name == "Router Client") return meshtastic_Config_DeviceConfig_Role_ROUTER_CLIENT;
+        if (name == "Router Late")   return meshtastic_Config_DeviceConfig_Role_ROUTER_LATE;
+        if (name == "Repeater")      return meshtastic_Config_DeviceConfig_Role_REPEATER;
+        if (name == "Tracker")       return meshtastic_Config_DeviceConfig_Role_TRACKER;
+        if (name == "Sensor")        return meshtastic_Config_DeviceConfig_Role_SENSOR;
+        if (name == "TAK")           return meshtastic_Config_DeviceConfig_Role_TAK;
+        if (name == "TAK Tracker")   return meshtastic_Config_DeviceConfig_Role_TAK_TRACKER;
+        if (name == "Lost&Found")    return meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND;
         return meshtastic_Config_DeviceConfig_Role_CLIENT;
     }
 

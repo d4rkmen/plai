@@ -9,6 +9,7 @@
  *
  */
 #include "app_monitor.h"
+#include "apps/utils/theme/theme_define.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "meshtastic/portnums.pb.h"
@@ -208,7 +209,7 @@ bool AppMonitor::_render_packet_list()
     canvas->setFont(FONT_12);
 
     auto& log = Mesh::MeshDataStore::getInstance().getPacketLog();
-    auto* nodedb = _data.hal->nodedb();
+    // auto* nodedb = _data.hal->nodedb();
     int total = (int)log.size();
     if (total == 0)
     {
@@ -450,19 +451,33 @@ bool AppMonitor::_render_packet_detail()
         const char* label;
         char value[32];
         uint32_t value_color;
+        bool is_header; // section divider row
     };
 
-    DetailRow rows[12];
+    DetailRow rows[28];
     int row_count = 0;
 
-    auto add_row = [&](const char* label, const char* val, uint32_t color = TFT_WHITE)
+    auto add_row = [&](const char* label, const char* val, uint32_t color = THEME_COLOR_UNSELECTED)
     {
-        if (row_count < 12)
+        if (row_count < 28)
         {
             rows[row_count].label = label;
             strncpy(rows[row_count].value, val, 31);
             rows[row_count].value[31] = '\0';
             rows[row_count].value_color = color;
+            rows[row_count].is_header = false;
+            row_count++;
+        }
+    };
+
+    auto add_header = [&](const char* label)
+    {
+        if (row_count < 28)
+        {
+            rows[row_count].label = label;
+            rows[row_count].value[0] = '\0';
+            rows[row_count].value_color = lgfx::v1::convert_to_rgb888(TFT_ORANGE);
+            rows[row_count].is_header = true;
             row_count++;
         }
     };
@@ -521,7 +536,7 @@ bool AppMonitor::_render_packet_detail()
         add_row("Port",
                 buf,
                 pkt.crc_error ? (uint32_t)THEME_COLOR_SIGNAL_NONE
-                              : (pkt.decoded ? (uint32_t)TFT_WHITE : (uint32_t)TFT_DARKGREY));
+                              : lgfx::v1::convert_to_rgb888((pkt.decoded ? TFT_WHITE : TFT_DARKGREY)));
     }
     // Size
     {
@@ -548,9 +563,9 @@ bool AppMonitor::_render_packet_detail()
         add_row("Hops", buf);
     }
     // Want ACK
-    add_row("WantACK", pkt.want_ack ? "yes" : "no", pkt.want_ack ? (uint32_t)TFT_YELLOW : (uint32_t)TFT_DARKGREY);
+    add_row("WantACK", pkt.want_ack ? "yes" : "no", lgfx::v1::convert_to_rgb888(pkt.want_ack ? TFT_YELLOW : TFT_DARKGREY));
     // Decoded
-    add_row("Decoded", pkt.decoded ? "yes" : "no", pkt.decoded ? (uint32_t)TFT_GREEN : (uint32_t)TFT_RED);
+    add_row("Decoded", pkt.decoded ? "yes" : "no", lgfx::v1::convert_to_rgb888(pkt.decoded ? TFT_GREEN : TFT_RED));
     // RSSI / SNR (RX only)
     if (!pkt.is_tx)
     {
@@ -571,6 +586,212 @@ bool AppMonitor::_render_packet_detail()
         add_row("SNR", buf);
     }
 
+    // Payload section (port-specific decoded data)
+    if (pkt.decoded && !pkt.crc_error)
+    {
+        auto& store = Mesh::MeshDataStore::getInstance();
+        switch (pkt.port)
+        {
+        case meshtastic_PortNum_TEXT_MESSAGE_APP:
+        {
+            add_header("TEXT");
+            std::string text_found;
+            if (pkt.to != 0xFFFFFFFF)
+            {
+                // DM: peer is the other party
+                uint32_t peer = pkt.is_tx ? pkt.to : pkt.from;
+                store.forEachDMMessage(peer,
+                                       [&](uint32_t, const Mesh::TextMessage& msg) -> bool
+                                       {
+                                           if (msg.id == pkt.id)
+                                           {
+                                               text_found = msg.text;
+                                               return false;
+                                           }
+                                           return true;
+                                       });
+            }
+            else
+            {
+                // Channel broadcast: search all channels
+                for (uint8_t ch = 0; ch < 8 && text_found.empty(); ch++)
+                {
+                    store.forEachChannelMessage(ch,
+                                                [&](uint32_t, const Mesh::TextMessage& msg) -> bool
+                                                {
+                                                    if (msg.id == pkt.id)
+                                                    {
+                                                        text_found = msg.text;
+                                                        return false;
+                                                    }
+                                                    return true;
+                                                });
+                }
+            }
+            if (!text_found.empty())
+            {
+                char tbuf[32];
+                strncpy(tbuf, text_found.c_str(), 31);
+                tbuf[31] = '\0';
+                add_row("Text", tbuf);
+                if (text_found.size() > 31)
+                    add_row("", "...(truncated)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            }
+            else
+            {
+                add_row("Text", "(not cached)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            }
+            break;
+        }
+        case meshtastic_PortNum_POSITION_APP:
+        {
+            add_header("POSITION");
+            Mesh::NodeInfo ni;
+            if (_data.hal->mesh() && _data.hal->mesh()->getNode(pkt.from, ni) && ni.info.has_position)
+            {
+                const auto& pos = ni.info.position;
+                char buf[32];
+                if (pos.has_latitude_i)
+                {
+                    snprintf(buf, sizeof(buf), "%.5f", pos.latitude_i * 1e-7);
+                    add_row("Lat", buf);
+                }
+                if (pos.has_longitude_i)
+                {
+                    snprintf(buf, sizeof(buf), "%.5f", pos.longitude_i * 1e-7);
+                    add_row("Lon", buf);
+                }
+                if (pos.has_altitude)
+                {
+                    snprintf(buf, sizeof(buf), "%dm", (int)pos.altitude);
+                    add_row("Alt", buf);
+                }
+                if (pos.sats_in_view > 0)
+                {
+                    snprintf(buf, sizeof(buf), "%u", (unsigned)pos.sats_in_view);
+                    add_row("Sats", buf);
+                }
+            }
+            else
+            {
+                add_row("", "(no position data)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            }
+            break;
+        }
+        case meshtastic_PortNum_NODEINFO_APP:
+        {
+            add_header("NODEINFO");
+            Mesh::NodeInfo ni;
+            if (_data.hal->mesh() && _data.hal->mesh()->getNode(pkt.from, ni) && ni.info.has_user)
+            {
+                const auto& user = ni.info.user;
+                if (user.long_name[0])
+                    add_row("Name", user.long_name);
+                if (user.short_name[0])
+                    add_row("Short", user.short_name);
+                add_row("Role", Mesh::NodeDB::getRoleName(user.role));
+            }
+            else
+            {
+                add_row("", "(no user data)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            }
+            break;
+        }
+        case meshtastic_PortNum_TELEMETRY_APP:
+        {
+            add_header("TELEMETRY");
+            Mesh::NodeInfo ni;
+            if (_data.hal->mesh() && _data.hal->mesh()->getNode(pkt.from, ni) && ni.info.has_device_metrics)
+            {
+                const auto& dm = ni.info.device_metrics;
+                char buf[32];
+                if (dm.has_battery_level)
+                {
+                    snprintf(buf, sizeof(buf), "%u%%", (unsigned)dm.battery_level);
+                    uint32_t bc = lgfx::v1::convert_to_rgb888(dm.battery_level > 50   ? TFT_GREEN
+                                                              : dm.battery_level > 20 ? TFT_YELLOW
+                                                                                      : TFT_RED);
+                    add_row("Batt", buf, bc);
+                }
+                if (dm.has_voltage)
+                {
+                    snprintf(buf, sizeof(buf), "%.2fV", dm.voltage);
+                    add_row("Volt", buf);
+                }
+                if (dm.has_uptime_seconds)
+                {
+                    uint32_t s = dm.uptime_seconds;
+                    if (s >= 86400)
+                        snprintf(buf, sizeof(buf), "%lud %luh", s / 86400, (s % 86400) / 3600);
+                    else if (s >= 3600)
+                        snprintf(buf, sizeof(buf), "%luh %lum", s / 3600, (s % 3600) / 60);
+                    else
+                        snprintf(buf, sizeof(buf), "%lum %lus", s / 60, s % 60);
+                    add_row("Up", buf);
+                }
+            }
+            else
+            {
+                add_row("", "(no metrics)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            }
+            break;
+        }
+        case meshtastic_PortNum_ROUTING_APP:
+        {
+            add_header("ROUTING");
+            add_row("Type", "ACK / NACK", lgfx::v1::convert_to_rgb888(TFT_YELLOW));
+            break;
+        }
+        case meshtastic_PortNum_TRACEROUTE_APP:
+        {
+            add_header("TRACEROUTE");
+            // Direction: TX = outgoing request, RX = incoming response
+            add_row("Dir", pkt.is_tx ? "Request" : "Response");
+            // Hops consumed so far
+            if (pkt.hop_start > 0)
+            {
+                char buf[16];
+                int used = pkt.hop_start - pkt.hop_limit;
+                snprintf(buf, sizeof(buf), "%d / %d", used, pkt.hop_start);
+                add_row("Hops", buf);
+            }
+            break;
+        }
+        case meshtastic_PortNum_WAYPOINT_APP:
+        {
+            add_header("WAYPOINT");
+            add_row("", "(position)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            break;
+        }
+        case meshtastic_PortNum_NEIGHBORINFO_APP:
+        {
+            add_header("NEIGHBORINFO");
+            add_row("", "(mesh topology)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            break;
+        }
+        case meshtastic_PortNum_RANGE_TEST_APP:
+        {
+            add_header("RANGE TEST");
+            add_row("", "(range probe)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            break;
+        }
+        case meshtastic_PortNum_STORE_FORWARD_APP:
+        {
+            add_header("STORE&FORWARD");
+            add_row("", "(relay queue)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            break;
+        }
+        case meshtastic_PortNum_ADMIN_APP:
+        {
+            add_header("ADMIN");
+            add_row("", "(encrypted)", lgfx::v1::convert_to_rgb888(TFT_DARKGREY));
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
     // Render visible rows
     const int row_height = 14;
     const int y_start = 15;
@@ -588,11 +809,19 @@ bool AppMonitor::_render_packet_detail()
     {
         const auto& row = rows[_data.detail_scroll + i];
 
-        canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
-        canvas->drawString(row.label, 4, y + 1);
-
-        canvas->setTextColor(row.value_color, THEME_COLOR_BG);
-        canvas->drawString(row.value, 60, y + 1);
+        if (row.is_header)
+        {
+            canvas->drawFastHLine(0, y + row_height / 2, canvas->width(), THEME_COLOR_BG_SELECTED);
+            canvas->setTextColor(TFT_ORANGE, THEME_COLOR_BG);
+            canvas->drawString(row.label, 4, y + 1);
+        }
+        else
+        {
+            canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
+            canvas->drawString(row.label, 4, y + 1);
+            canvas->setTextColor(row.value_color, THEME_COLOR_BG);
+            canvas->drawString(row.value, 60, y + 1);
+        }
 
         y += row_height + 1;
     }

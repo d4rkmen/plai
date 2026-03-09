@@ -137,6 +137,13 @@ namespace Mesh
         static std::string getLabel(const NodeInfo& node);
 
         /**
+         * @brief Human-readable name for a device role enum value.
+         * @param role Role enum from meshtastic_Config_DeviceConfig_Role
+         * @return Short display string (e.g. "Router", "Tracker")
+         */
+        static const char* getRoleName(meshtastic_Config_DeviceConfig_Role role);
+
+        /**
          * @brief Get number of nodes in database
          * @return Node count
          */

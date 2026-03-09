@@ -419,6 +419,27 @@ namespace Mesh
         return label;
     }
 
+    const char* NodeDB::getRoleName(meshtastic_Config_DeviceConfig_Role role)
+    {
+        switch (role)
+        {
+        case meshtastic_Config_DeviceConfig_Role_CLIENT:        return "Client";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE:   return "Client Mute";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT_HIDDEN: return "Client Hidden";
+        case meshtastic_Config_DeviceConfig_Role_CLIENT_BASE:   return "Client Base";
+        case meshtastic_Config_DeviceConfig_Role_ROUTER:        return "Router";
+        case meshtastic_Config_DeviceConfig_Role_ROUTER_CLIENT: return "Router Client";
+        case meshtastic_Config_DeviceConfig_Role_ROUTER_LATE:   return "Router Late";
+        case meshtastic_Config_DeviceConfig_Role_REPEATER:      return "Repeater";
+        case meshtastic_Config_DeviceConfig_Role_TRACKER:       return "Tracker";
+        case meshtastic_Config_DeviceConfig_Role_SENSOR:        return "Sensor";
+        case meshtastic_Config_DeviceConfig_Role_TAK:           return "TAK";
+        case meshtastic_Config_DeviceConfig_Role_TAK_TRACKER:   return "TAK Tracker";
+        case meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND: return "Lost&Found";
+        default:                                                return "Unknown";
+        }
+    }
+
     void NodeDB::fillIndexEntryFromNode(NodeIndexEntry& entry, const NodeInfo& node)
     {
         entry.node_id = node.info.num;

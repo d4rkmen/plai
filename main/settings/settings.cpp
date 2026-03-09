@@ -260,7 +260,7 @@ namespace SETTINGS
              TYPE_STRING,
              "Client",
              "Client",
-             "Client;Client Mute;Client Hidden;Tracker;Lost+Found;Sensor;TAK;TAK Tracker;Repeater;Router",
+             "Client;Client Mute;Client Hidden;Client Base;Router;Router Client;Router Late;Repeater;Tracker;Sensor;TAK;TAK Tracker;Lost&Found",
              "",
              "Device role (affects routing behavior)",
              nodeinfo_apply_cb},
