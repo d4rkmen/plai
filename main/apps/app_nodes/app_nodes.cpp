@@ -164,6 +164,7 @@ void AppNodes::onCreate()
     _data.ign_total_count = 0;
     _data.ign_selected_index = 0;
     _data.ign_scroll_offset = 0;
+    _data.dm_ctrl = false;
 
     // Initialize scrolling text context for node names (FONT_12)
     scroll_text_init_ex(&_data.name_scroll_ctx,
