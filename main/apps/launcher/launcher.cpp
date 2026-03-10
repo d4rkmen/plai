@@ -302,23 +302,6 @@ uint32_t _bat_update_time_count = 0;
 
 void Launcher::_update_system_state()
 {
-    // Refresh dim_time from settings when changed
-    _data.hal->keyboard()->set_dim_time(_data.hal->settings()->getNumber("system", "dim_time") * 1000);
-
-    // brightness
-    int32_t brightness = _data.hal->display()->getBrightness();
-    int32_t new_brightness = _data.hal->settings()->getNumber("system", "brightness");
-    if (!_data.hal->keyboard()->isDimmed() && brightness != new_brightness)
-    {
-        _data.hal->display()->setBrightness(new_brightness);
-    }
-    // volume
-    int32_t volume = _data.hal->speaker()->getVolume();
-    int32_t new_volume = _data.hal->settings()->getNumber("system", "volume");
-    if (volume != new_volume)
-    {
-        _data.hal->speaker()->setVolume(new_volume);
-    }
 // USB host
 #if HAL_USE_USB
     bool usb_host_enabled = _data.hal->usb()->is_initialized();
@@ -336,7 +319,6 @@ void Launcher::_update_system_state()
     }
 #endif
     // Time display
-    // if (_data.hal->isGPSAdjusted())
     {
         static time_t now;
         static struct tm timeinfo;

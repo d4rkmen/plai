@@ -39,8 +39,32 @@ namespace SETTINGS
         sys_group.items = {
             back_item,
             {"brightness", "Brightness", TYPE_NUMBER, "100", "100", "10", "255", "Screen brightness level (10-255)"},
-            {"volume", "Volume", TYPE_NUMBER, "64", "64", "0", "255", "System sound volume level (0-255)"},
-            {"dim_time", "Dim seconds", TYPE_NUMBER, "30", "30", "0", "3600", "Screen dimming time in seconds (0-3600)"},
+            {"volume",
+             "Volume",
+             TYPE_NUMBER,
+             "64",
+             "64",
+             "0",
+             "255",
+             "System sound volume level (0-255)",
+             [this](SettingItem_t& item)
+             {
+                 if (_hal && _hal->speaker())
+                     _hal->speaker()->setVolume(std::stoi(item.value));
+             }},
+            {"dim_time",
+             "Dim seconds",
+             TYPE_NUMBER,
+             "30",
+             "30",
+             "0",
+             "3600",
+             "Screen dimming time in seconds (0-3600)",
+             [this](SettingItem_t& item)
+             {
+                 if (_hal && _hal->keyboard())
+                     _hal->keyboard()->set_dim_time(std::stoi(item.value) * 1000);
+             }},
             {"boot_sound", "Boot sound", TYPE_BOOL, "true", "true", "", "", "Play boot sound on startup"},
             {"show_bat_volt", "Battery voltage", TYPE_BOOL, "true", "true", "", "", "Show battery voltage on the system bar"},
             {"show_time", "Show time", TYPE_BOOL, "true", "true", "", "", "Show time on the system bar"},
@@ -260,7 +284,8 @@ namespace SETTINGS
              TYPE_STRING,
              "Client",
              "Client",
-             "Client;Client Mute;Client Hidden;Client Base;Router;Router Client;Router Late;Repeater;Tracker;Sensor;TAK;TAK Tracker;Lost&Found",
+             "Client;Client Mute;Client Hidden;Client Base;Router;Router Client;Router Late;Repeater;Tracker;Sensor;TAK;TAK "
+             "Tracker;Lost&Found",
              "",
              "Device role (affects routing behavior)",
              nodeinfo_apply_cb},
@@ -1100,6 +1125,12 @@ namespace SETTINGS
             ESP_LOGI(TAG, "Settings successfully imported from %s", filename.c_str());
             // apply timezone
             applyTimezone(getString("system", "timezone"));
+            // apply dim_time
+            if (_hal && _hal->keyboard())
+                _hal->keyboard()->set_dim_time(getNumber("system", "dim_time") * 1000);
+            // apply volume
+            if (_hal && _hal->speaker())
+                _hal->speaker()->setVolume(getNumber("system", "volume"));
             // Re-apply LoRa / mesh config so the radio immediately uses the imported values
             if (_hal && _hal->mesh())
             {
