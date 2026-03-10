@@ -24,7 +24,10 @@ extern const uint8_t boot_sound_wav_end[] asm("_binary_boot_sound_wav_end");
 void Launcher::_boot_anim()
 {
     // Show logo
+    _data.hal->display()->clear();
     _data.hal->display()->drawPng(boot_logo_start, boot_logo_end - boot_logo_start);
+    // set brightness
+    _data.hal->display()->setBrightness(_data.hal->settings()->getNumber("system", "brightness"));
     bool has_boot_sound = _data.hal->settings()->getBool("system", "boot_sound");
     if (has_boot_sound)
         _data.hal->speaker()->playWav(boot_sound_wav_start, boot_sound_wav_end - boot_sound_wav_start);

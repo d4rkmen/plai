@@ -42,7 +42,6 @@ void Launcher::onCreate()
     _data.hal = mcAppGetDatabase()->Get("HAL")->value<HAL::Hal*>();
     _data.system_bar_force_update_flag = mcAppGetDatabase()->Get("SYSTEM_BAR_FORCE_UPDATE")->value<bool*>();
     // settings
-    _data.hal->display()->setBrightness(_data.hal->settings()->getNumber("system", "brightness"));
     _data.hal->speaker()->setVolume(_data.hal->settings()->getNumber("system", "volume"));
     _data.hal->keyboard()->setDimmed(false);
     _data.hal->keyboard()->set_dim_time(_data.hal->settings()->getNumber("system", "dim_time") * 1000);

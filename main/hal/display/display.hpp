@@ -67,6 +67,7 @@ public:
         setPanel(&_panel_instance);
         // initialize the display
         init();
+        setBrightness(0);
         setRotation(1);
     }
 };
