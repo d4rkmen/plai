@@ -568,7 +568,6 @@ bool AppNodes::_render_node_list()
 
     std::vector<Mesh::NodeInfo> visible_nodes;
     size_t loaded = nodedb->getNodesInRange(_data.scroll_offset, LIST_MAX_VISIBLE_ITEMS, visible_nodes, _data.sort_order);
-    uint32_t our_id = _data.hal->mesh() ? _data.hal->mesh()->getNodeId() : 0;
 
     auto& store = Mesh::MeshDataStore::getInstance();
 

@@ -2111,16 +2111,103 @@ namespace Mesh
             le.is_tx = false;
             le.decoded = decoded_ok;
             le.port = decoded_ok ? decoded_packet.decoded.portnum : 0;
-            if (decoded_ok && decoded_packet.decoded.portnum == meshtastic_PortNum_ROUTING_APP)
+            if (decoded_ok)
             {
-                le.request_id = decoded_packet.decoded.request_id;
-                meshtastic_Routing routing = meshtastic_Routing_init_default;
-                pb_istream_t r_stream =
-                    pb_istream_from_buffer(decoded_packet.decoded.payload.bytes, decoded_packet.decoded.payload.size);
-                if (pb_decode(&r_stream, meshtastic_Routing_fields, &routing) &&
-                    routing.which_variant == meshtastic_Routing_error_reason_tag)
+                const uint8_t* pb = decoded_packet.decoded.payload.bytes;
+                size_t ps = decoded_packet.decoded.payload.size;
+                switch (decoded_packet.decoded.portnum)
                 {
-                    le.routing_error = (uint8_t)routing.error_reason;
+                case meshtastic_PortNum_TEXT_MESSAGE_APP:
+                {
+                    size_t n = std::min(ps, sizeof(le.payload_desc) - 1);
+                    memcpy(le.payload_desc, pb, n);
+                    le.payload_desc[n] = '\0';
+                    break;
+                }
+                case meshtastic_PortNum_POSITION_APP:
+                {
+                    meshtastic_Position pos = meshtastic_Position_init_zero;
+                    pb_istream_t s = pb_istream_from_buffer(pb, ps);
+                    if (pb_decode(&s, meshtastic_Position_fields, &pos) && pos.has_latitude_i && pos.has_longitude_i)
+                    {
+                        int w = snprintf(le.payload_desc, sizeof(le.payload_desc), "%.7f, %.7f",
+                                         pos.latitude_i * 1e-7, pos.longitude_i * 1e-7);
+                        if (pos.has_altitude && w > 0 && w < (int)sizeof(le.payload_desc) - 1)
+                            snprintf(le.payload_desc + w, sizeof(le.payload_desc) - w, ", %dm", (int)pos.altitude);
+                    }
+                    break;
+                }
+                case meshtastic_PortNum_NODEINFO_APP:
+                {
+                    meshtastic_User user = meshtastic_User_init_default;
+                    pb_istream_t s = pb_istream_from_buffer(pb, ps);
+                    if (pb_decode(&s, meshtastic_User_fields, &user))
+                        snprintf(le.payload_desc, sizeof(le.payload_desc), "%s (%s) [%s]",
+                                 user.long_name, user.short_name, NodeDB::getRoleName(user.role));
+                    break;
+                }
+                case meshtastic_PortNum_ROUTING_APP:
+                {
+                    meshtastic_Routing routing = meshtastic_Routing_init_default;
+                    pb_istream_t s = pb_istream_from_buffer(pb, ps);
+                    if (pb_decode(&s, meshtastic_Routing_fields, &routing) &&
+                        routing.which_variant == meshtastic_Routing_error_reason_tag)
+                    {
+                        uint8_t err = (uint8_t)routing.error_reason;
+                        if (err == meshtastic_Routing_Error_NONE)
+                        {
+                            strncpy(le.payload_desc, "ACK", sizeof(le.payload_desc));
+                        }
+                        else
+                        {
+                            static const struct { uint8_t code; const char* name; } errs[] = {
+                                {meshtastic_Routing_Error_NO_ROUTE, "NO_ROUTE"},
+                                {meshtastic_Routing_Error_GOT_NAK, "GOT_NAK"},
+                                {meshtastic_Routing_Error_TIMEOUT, "TIMEOUT"},
+                                {meshtastic_Routing_Error_NO_INTERFACE, "NO_IFACE"},
+                                {meshtastic_Routing_Error_MAX_RETRANSMIT, "MAX_RETRY"},
+                                {meshtastic_Routing_Error_NO_CHANNEL, "NO_CHAN"},
+                                {meshtastic_Routing_Error_TOO_LARGE, "TOO_LARGE"},
+                                {meshtastic_Routing_Error_NO_RESPONSE, "NO_RESP"},
+                                {meshtastic_Routing_Error_DUTY_CYCLE_LIMIT, "DUTY_LIM"},
+                                {meshtastic_Routing_Error_BAD_REQUEST, "BAD_REQ"},
+                                {meshtastic_Routing_Error_NOT_AUTHORIZED, "UNAUTH"},
+                                {meshtastic_Routing_Error_PKI_FAILED, "PKI_FAIL"},
+                                {meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY, "NO_KEY"},
+                            };
+                            const char* name = nullptr;
+                            for (const auto& e : errs)
+                                if (e.code == err) { name = e.name; break; }
+                            if (name)
+                                snprintf(le.payload_desc, sizeof(le.payload_desc), "%s (0x%02x)", name, err);
+                            else
+                                snprintf(le.payload_desc, sizeof(le.payload_desc), "ERR_%u (0x%02x)", err, err);
+                        }
+                    }
+                    break;
+                }
+                case meshtastic_PortNum_TELEMETRY_APP:
+                {
+                    meshtastic_Telemetry tel = meshtastic_Telemetry_init_zero;
+                    pb_istream_t s = pb_istream_from_buffer(pb, ps);
+                    if (pb_decode(&s, meshtastic_Telemetry_fields, &tel) &&
+                        tel.which_variant == meshtastic_Telemetry_device_metrics_tag)
+                    {
+                        const auto& dm = tel.variant.device_metrics;
+                        snprintf(le.payload_desc, sizeof(le.payload_desc), "%u%%, %.2fV",
+                                 (unsigned)dm.battery_level, dm.voltage);
+                    }
+                    break;
+                }
+                case meshtastic_PortNum_TRACEROUTE_APP:
+                {
+                    int hops = (packet.hop_start > 0) ? (packet.hop_start - packet.hop_limit) : 0;
+                    snprintf(le.payload_desc, sizeof(le.payload_desc), "%s, %d hops",
+                             decoded_packet.decoded.want_response ? "Request" : "Response", hops);
+                    break;
+                }
+                default:
+                    break;
                 }
             }
             MeshDataStore::getInstance().addPacketLogEntry(le);

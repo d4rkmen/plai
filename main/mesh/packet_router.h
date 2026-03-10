@@ -109,7 +109,9 @@ namespace Mesh
                        bool reliable = false,
                        uint8_t port_hint = 0);
 
-        bool enqueueTxRaw(const uint8_t* data, uint8_t len, PacketPriority priority = PacketPriority::DEFAULT,
+        bool enqueueTxRaw(const uint8_t* data,
+                          uint8_t len,
+                          PacketPriority priority = PacketPriority::DEFAULT,
                           uint8_t port_hint = 0);
 
         bool dequeueTx(QueuedPacket& packet);
@@ -134,8 +136,10 @@ namespace Mesh
          * @param wasUpgraded  [out] Set true if hop_limit was upgraded
          * @return true if the packet was already in the history (duplicate)
          */
-        bool wasSeenRecently(const meshtastic_MeshPacket* p, bool withUpdate = true,
-                             bool* wasFallback = nullptr, bool* weWereNextHop = nullptr,
+        bool wasSeenRecently(const meshtastic_MeshPacket* p,
+                             bool withUpdate = true,
+                             bool* wasFallback = nullptr,
+                             bool* weWereNextHop = nullptr,
                              bool* wasUpgraded = nullptr);
 
         bool wasRelayer(uint8_t relayer, uint32_t id, uint32_t sender, bool* wasSole = nullptr);

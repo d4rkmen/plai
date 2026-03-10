@@ -16,10 +16,7 @@
 
 static const char* TAG = "PACKET_ROUTER";
 
-static inline uint32_t millis()
-{
-    return xTaskGetTickCount() * portTICK_PERIOD_MS;
-}
+static inline uint32_t millis() { return xTaskGetTickCount() * portTICK_PERIOD_MS; }
 
 namespace Mesh
 {
@@ -28,10 +25,7 @@ namespace Mesh
     // Hop-limit helpers (packed byte: [5:3]=ourTxHopLimit, [2:0]=highestHopLimit)
     // =========================================================================
 
-    uint8_t PacketRouter::getHighestHopLimit(const PacketRecord& r)
-    {
-        return r.hop_limit & HOP_LIMIT_HIGHEST_MASK;
-    }
+    uint8_t PacketRouter::getHighestHopLimit(const PacketRecord& r) { return r.hop_limit & HOP_LIMIT_HIGHEST_MASK; }
 
     void PacketRouter::setHighestHopLimit(PacketRecord& r, uint8_t hopLimit)
     {
@@ -109,8 +103,11 @@ namespace Mesh
 
         setNodeId(our_node_id);
 
-        ESP_LOGI(TAG, "Packet router ready (TX=%u, RX=%u, history=%u, static=%u bytes)",
-                 (unsigned)TX_QUEUE_SIZE, (unsigned)RX_QUEUE_SIZE, (unsigned)PACKET_HISTORY_SIZE,
+        ESP_LOGI(TAG,
+                 "Packet router ready (TX=%u, RX=%u, history=%u, static=%u bytes)",
+                 (unsigned)TX_QUEUE_SIZE,
+                 (unsigned)RX_QUEUE_SIZE,
+                 (unsigned)PACKET_HISTORY_SIZE,
                  (unsigned)sizeof(PacketRouter));
         return true;
     }
@@ -183,9 +180,8 @@ namespace Mesh
     // wasSeenRecently  (ported from Meshtastic PacketHistory::wasSeenRecently)
     // =========================================================================
 
-    bool PacketRouter::wasSeenRecently(const meshtastic_MeshPacket* p, bool withUpdate,
-                                       bool* wasFallback, bool* weWereNextHop,
-                                       bool* wasUpgraded)
+    bool PacketRouter::wasSeenRecently(
+        const meshtastic_MeshPacket* p, bool withUpdate, bool* wasFallback, bool* weWereNextHop, bool* wasUpgraded)
     {
         if (p->id == 0)
             return false;
@@ -218,8 +214,11 @@ namespace Mesh
         // Check for hop_limit upgrade
         if (seenRecently && wasUpgraded && getHighestHopLimit(*found) < p->hop_limit)
         {
-            ESP_LOGD(TAG, "Hop limit upgrade: packet 0x%08lX from %u to %u",
-                     (unsigned long)p->id, getHighestHopLimit(*found), p->hop_limit);
+            ESP_LOGD(TAG,
+                     "Hop limit upgrade: packet 0x%08lX from %u to %u",
+                     (unsigned long)p->id,
+                     getHighestHopLimit(*found),
+                     p->hop_limit);
             *wasUpgraded = true;
         }
         else if (wasUpgraded)
@@ -232,12 +231,9 @@ namespace Mesh
             // Fallback-to-flooding detection
             if (wasFallback)
             {
-                if (found->sender != _our_node_id &&
-                    found->next_hop != NO_NEXT_HOP_PREFERENCE &&
-                    found->next_hop != _our_relay_id &&
-                    p->next_hop == NO_NEXT_HOP_PREFERENCE &&
-                    isRelayer(p->relay_node, *found) &&
-                    !isRelayer(_our_relay_id, *found) &&
+                if (found->sender != _our_node_id && found->next_hop != NO_NEXT_HOP_PREFERENCE &&
+                    found->next_hop != _our_relay_id && p->next_hop == NO_NEXT_HOP_PREFERENCE &&
+                    isRelayer(p->relay_node, *found) && !isRelayer(_our_relay_id, *found) &&
                     !isRelayer(found->next_hop, *found))
                 {
                     *wasFallback = true;
@@ -258,8 +254,7 @@ namespace Mesh
                 {
                     bool weWereRelayer = isRelayer(_our_relay_id, *found);
                     if (weWereRelayer &&
-                        (p->hop_limit == getOurTxHopLimit(*found) ||
-                         p->hop_limit == getOurTxHopLimit(*found) - 1))
+                        (p->hop_limit == getOurTxHopLimit(*found) || p->hop_limit == getOurTxHopLimit(*found) - 1))
                     {
                         r.relayed_by[0] = p->relay_node;
                         startIdx = 1;
@@ -354,8 +349,7 @@ namespace Mesh
     // TX queue (FreeRTOS static queue — built-in thread safety)
     // =========================================================================
 
-    bool PacketRouter::enqueueTx(const meshtastic_MeshPacket& packet, PacketPriority priority, bool reliable,
-                                 uint8_t port_hint)
+    bool PacketRouter::enqueueTx(const meshtastic_MeshPacket& packet, PacketPriority priority, bool reliable, uint8_t port_hint)
     {
         // Mark as seen before sending (Meshtastic FloodingRouter::send)
         markSentPacket(packet);
@@ -377,8 +371,7 @@ namespace Mesh
         header.relay_node = packet.relay_node;
         header.flags = (packet.hop_limit & PACKET_FLAGS_HOP_LIMIT_MASK) |
                        ((packet.hop_start << PACKET_FLAGS_HOP_START_SHIFT) & PACKET_FLAGS_HOP_START_MASK) |
-                       (packet.want_ack ? PACKET_FLAGS_WANT_ACK_MASK : 0) |
-                       (packet.via_mqtt ? PACKET_FLAGS_VIA_MQTT_MASK : 0);
+                       (packet.want_ack ? PACKET_FLAGS_WANT_ACK_MASK : 0) | (packet.via_mqtt ? PACKET_FLAGS_VIA_MQTT_MASK : 0);
 
         memcpy(qp.raw_data, &header, sizeof(header));
 
@@ -439,20 +432,11 @@ namespace Mesh
         return xQueueSend(_tx_queue, &qp, pdMS_TO_TICKS(100)) == pdTRUE;
     }
 
-    bool PacketRouter::dequeueTx(QueuedPacket& packet)
-    {
-        return xQueueReceive(_tx_queue, &packet, 0) == pdTRUE;
-    }
+    bool PacketRouter::dequeueTx(QueuedPacket& packet) { return xQueueReceive(_tx_queue, &packet, 0) == pdTRUE; }
 
-    bool PacketRouter::hasTxPackets() const
-    {
-        return uxQueueMessagesWaiting(_tx_queue) > 0;
-    }
+    bool PacketRouter::hasTxPackets() const { return uxQueueMessagesWaiting(_tx_queue) > 0; }
 
-    size_t PacketRouter::getTxQueueSize() const
-    {
-        return (size_t)uxQueueMessagesWaiting(_tx_queue);
-    }
+    size_t PacketRouter::getTxQueueSize() const { return (size_t)uxQueueMessagesWaiting(_tx_queue); }
 
     // =========================================================================
     // RX queue (FreeRTOS static queue — built-in thread safety)
@@ -510,8 +494,11 @@ namespace Mesh
             return false;
         }
 
-        ESP_LOGD(TAG, "Enqueued RX packet, RSSI=%d, SNR=%.1f, queue size: %u",
-                 rssi, snr, (unsigned)uxQueueMessagesWaiting(_rx_queue));
+        ESP_LOGD(TAG,
+                 "Enqueued RX packet, RSSI=%d, SNR=%.1f, queue size: %u",
+                 rssi,
+                 snr,
+                 (unsigned)uxQueueMessagesWaiting(_rx_queue));
         return true;
     }
 
@@ -531,14 +518,18 @@ namespace Mesh
                 // Own packet reflected by relay → pass through for implicit ACK
                 if (qp.packet.from == _our_node_id)
                 {
-                    ESP_LOGD(TAG, "Own packet 0x%08lX reflected by relay 0x%02X",
-                             (unsigned long)qp.packet.id, qp.packet.relay_node);
+                    ESP_LOGD(TAG,
+                             "Own packet 0x%08lX reflected by relay 0x%02X",
+                             (unsigned long)qp.packet.id,
+                             qp.packet.relay_node);
                     _rx_callback(qp.packet, qp.packet.rx_rssi, qp.packet.rx_snr);
                     continue;
                 }
 
-                ESP_LOGD(TAG, "Dropping duplicate packet 0x%08lX from 0x%08lX",
-                         (unsigned long)qp.packet.id, (unsigned long)qp.packet.from);
+                ESP_LOGD(TAG,
+                         "Dropping duplicate packet 0x%08lX from 0x%08lX",
+                         (unsigned long)qp.packet.id,
+                         (unsigned long)qp.packet.from);
                 continue;
             }
 

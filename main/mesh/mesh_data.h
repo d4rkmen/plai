@@ -51,10 +51,10 @@ namespace Mesh
     /**
      * @brief Traceroute file magic and limits
      */
-    constexpr uint32_t TRC_FILE_MAGIC = 0x43525454;   // "TTRC"
+    constexpr uint32_t TRC_FILE_MAGIC = 0x43525454; // "TTRC"
     constexpr uint32_t TRC_FILE_VERSION = 2;
     constexpr size_t MAX_TRACEROUTES_PER_NODE = 50;
-    constexpr size_t TRC_FILE_HEADER_SIZE = 12;        // magic(4) + version(4) + count(4)
+    constexpr size_t TRC_FILE_HEADER_SIZE = 12; // magic(4) + version(4) + count(4)
 
     /**
      * @brief Fixed-size on-disk traceroute record (95 bytes)
@@ -63,16 +63,16 @@ namespace Mesh
     {
         uint32_t target_node_id;
         uint32_t timestamp;
-        uint16_t duration_sec;   // Round-trip time in seconds (0 if pending/unknown)
-        uint8_t status;          // 0=PENDING, 1=SUCCESS, 2=FAILED
+        uint16_t duration_sec; // Round-trip time in seconds (0 if pending/unknown)
+        uint8_t status;        // 0=PENDING, 1=SUCCESS, 2=FAILED
         uint8_t route_to_count;
         uint8_t route_back_count;
-        int8_t dest_snr_q4;     // SNR at destination * 4
-        int8_t origin_snr_q4;   // SNR at origin (return) * 4
+        int8_t dest_snr_q4;   // SNR at destination * 4
+        int8_t origin_snr_q4; // SNR at origin (return) * 4
         struct __attribute__((packed))
         {
             uint32_t node_id;
-            int8_t snr_q4;       // SNR * 4
+            int8_t snr_q4; // SNR * 4
         } route_to[8];
         struct __attribute__((packed))
         {
@@ -130,13 +130,13 @@ namespace Mesh
         };
 
         uint32_t target_node_id;               // Destination node
-        uint32_t timestamp;                     // Unix timestamp when sent
-        uint16_t duration_sec;                  // Round-trip time in seconds (0 if pending/unknown)
-        Status status;                          // Current state
-        float dest_snr;                         // SNR at destination (last entry in snr_towards)
-        float origin_snr;                       // SNR at origin on return (last entry in snr_back)
-        std::vector<TraceRouteHop> route_to;    // Hops towards destination
-        std::vector<TraceRouteHop> route_back;  // Hops on the way back
+        uint32_t timestamp;                    // Unix timestamp when sent
+        uint16_t duration_sec;                 // Round-trip time in seconds (0 if pending/unknown)
+        Status status;                         // Current state
+        float dest_snr;                        // SNR at destination (last entry in snr_towards)
+        float origin_snr;                      // SNR at origin on return (last entry in snr_back)
+        std::vector<TraceRouteHop> route_to;   // Hops towards destination
+        std::vector<TraceRouteHop> route_back; // Hops on the way back
     };
 
     /**
@@ -156,8 +156,7 @@ namespace Mesh
         uint8_t hop_start;     // Original hop start
         uint8_t channel;       // Channel hash
         uint8_t rx_snr_raw;    // Raw SNR from radio * 4 (RX only)
-        uint32_t request_id;   // For ROUTING_APP: ID of the packet being ACKed/NACKed (0 otherwise)
-        uint8_t routing_error; // For ROUTING_APP: meshtastic_Routing_Error value (0 = ACK/NONE)
+        char payload_desc[50]; // Human-readable payload summary, filled at capture time
         bool is_tx;            // true = TX, false = RX
         bool decoded;          // true if payload was successfully decoded
         bool want_ack;         // Want ACK flag
@@ -346,8 +345,7 @@ namespace Mesh
          * @param callback Function called for each message (index, message). Return false to stop.
          * @return Number of messages iterated
          */
-        uint32_t forEachDMMessage(uint32_t node_id,
-                                   std::function<bool(uint32_t index, const TextMessage& msg)> callback) const;
+        uint32_t forEachDMMessage(uint32_t node_id, std::function<bool(uint32_t index, const TextMessage& msg)> callback) const;
 
         /**
          * @brief Get total message count for a channel conversation without loading messages
@@ -362,8 +360,7 @@ namespace Mesh
          * @param out      Output vector (appended)
          * @return Number of messages actually loaded
          */
-        uint32_t
-        getChannelMessageRange(uint8_t channel, uint32_t start, uint32_t count, std::vector<TextMessage>& out) const;
+        uint32_t getChannelMessageRange(uint8_t channel, uint32_t start, uint32_t count, std::vector<TextMessage>& out) const;
 
         /**
          * @brief Iterate over all channel messages sequentially, loading one at a time.
@@ -374,7 +371,7 @@ namespace Mesh
          * @return Number of messages iterated
          */
         uint32_t forEachChannelMessage(uint8_t channel,
-                                        std::function<bool(uint32_t index, const TextMessage& msg)> callback) const;
+                                       std::function<bool(uint32_t index, const TextMessage& msg)> callback) const;
 
         /**
          * @brief Get list of conversations with unread messages
@@ -408,8 +405,7 @@ namespace Mesh
          * @param out      Output vector (appended)
          * @return Number of records actually loaded
          */
-        uint32_t getTraceRouteRange(uint32_t node_id, uint32_t start, uint32_t count,
-                                     std::vector<TraceRouteResult>& out) const;
+        uint32_t getTraceRouteRange(uint32_t node_id, uint32_t start, uint32_t count, std::vector<TraceRouteResult>& out) const;
 
         /**
          * @brief Load a single traceroute result by index
