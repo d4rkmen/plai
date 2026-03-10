@@ -97,7 +97,9 @@ extern "C" void app_main(void)
         // Update mesh service (process BLE/radio events)
         hal.updateMesh();
 
-        // Small delay to prevent watchdog trigger
-        vTaskDelay(1);
+        // When display is sleeping, reduce CPU wake frequency to save power.
+        // LoRa DIO1 ISR still fires asynchronously and packets are processed
+        // on the next loop iteration (within ~100ms worst case).
+        vTaskDelay(hal.isDisplaySleeping() ? pdMS_TO_TICKS(100) : 1);
     }
 }

@@ -80,7 +80,7 @@ namespace UTILS
                         uint32_t scroll_pause_ms)
         {
             ESP_LOGW(TAG, "show_dialog: title=%s, message=%s", title.c_str(), message.c_str());
-            // set brightness to settings value
+            hal->displayWakeup();
             int brightness = hal->settings()->getNumber("system", "brightness");
             hal->display()->setBrightness(brightness == 0 ? 100 : brightness);
             // set font
@@ -1000,6 +1000,7 @@ namespace UTILS
             }
 
             // wake up screen
+            hal->displayWakeup();
             int brightness = hal->settings()->getNumber("system", "brightness");
             hal->display()->setBrightness(brightness == 0 ? 100 : brightness);
 

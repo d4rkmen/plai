@@ -54,6 +54,7 @@ void Launcher::onCreate()
             if (!dimmed)
             {
                 ESP_LOGD(TAG, "Screen on");
+                _data.hal->displayWakeup();
                 _data.hal->display()->setBrightness(_data.hal->settings()->getNumber("system", "brightness"));
             }
             else
@@ -278,7 +279,7 @@ void Launcher::_update_keyboard_state()
     _data.hal->keyboard()->updateKeyList();
     _data.hal->keyboard()->updateKeysState();
 
-    // Dimming slowly
+    // Dimming slowly, then put display to sleep for power saving
     uint32_t now = millis();
     static uint32_t last_dim_step_time = 0;
     if (now - last_dim_step_time > 50)
@@ -288,7 +289,10 @@ void Launcher::_update_keyboard_state()
         if (_data.hal->keyboard()->isDimmed() && brightness > 0)
         {
             uint8_t dim_step = 5;
-            _data.hal->display()->setBrightness(brightness > dim_step ? brightness - dim_step : 0);
+            uint8_t new_brightness = brightness > dim_step ? brightness - dim_step : 0;
+            _data.hal->display()->setBrightness(new_brightness);
+            if (new_brightness == 0)
+                _data.hal->displaySleep();
         }
     }
     // Check for screenshot key combination: CTRL + SPACE

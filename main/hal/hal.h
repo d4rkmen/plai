@@ -76,6 +76,7 @@ namespace HAL
         LGFX_Device* _display;
         LGFX_Sprite* _canvas;
         LGFX_Sprite* _canvas_system_bar;
+        bool _display_sleeping = false;
 #endif
 #if HAL_USE_KEYBOARD
         KEYBOARD::Keyboard* _keyboard;
@@ -172,8 +173,33 @@ namespace HAL
         inline LGFX_Device* display() { return _display; }
         inline LGFX_Sprite* canvas() { return _canvas; }
         inline LGFX_Sprite* canvas_system_bar() { return _canvas_system_bar; }
-        inline void canvas_system_bar_update() { _canvas_system_bar->pushSprite(0, 0); }
-        inline void canvas_update() { _canvas->pushSprite(0, _canvas_system_bar->height()); }
+        inline void canvas_system_bar_update()
+        {
+            if (!_display_sleeping)
+                _canvas_system_bar->pushSprite(0, 0);
+        }
+        inline void canvas_update()
+        {
+            if (!_display_sleeping)
+                _canvas->pushSprite(0, _canvas_system_bar->height());
+        }
+        inline bool isDisplaySleeping() const { return _display_sleeping; }
+        inline void displaySleep()
+        {
+            if (!_display_sleeping)
+            {
+                _display_sleeping = true;
+                _display->sleep();
+            }
+        }
+        inline void displayWakeup()
+        {
+            if (_display_sleeping)
+            {
+                _display_sleeping = false;
+                _display->wakeup();
+            }
+        }
 #endif
 #if HAL_USE_KEYBOARD
         inline KEYBOARD::Keyboard* keyboard() { return _keyboard; }
