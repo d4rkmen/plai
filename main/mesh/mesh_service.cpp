@@ -2066,6 +2066,13 @@ namespace Mesh
             packet.via_mqtt ? 1 : 0,
             packet.relay_node);
 
+        // Skip packets from ignored nodes (but not our own relayed packets)
+        if (packet.from != _config.node_id && Mesh::ignorelist_contains(packet.from))
+        {
+            ESP_LOGW(TAG, "Ignoring packet from 0x%08lX (in ignore list)", (unsigned long)packet.from);
+            return;
+        }
+
         meshtastic_MeshPacket decoded_packet = meshtastic_MeshPacket_init_default;
         meshtastic_Routing_Error decode_err = decodeMeshPacket(packet, decoded_packet);
         bool decoded_ok = (decode_err == meshtastic_Routing_Error_NONE);

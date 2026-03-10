@@ -40,6 +40,8 @@ namespace Mesh
     constexpr const char* PREFS_FILE = "/sdcard/meshtastic/prefs.pb";
     constexpr const char* CHANNELS_FILE = "/sdcard/meshtastic/channels.pb";
     constexpr const char* GREETINGS_FILE = "/sdcard/meshtastic/greetings.dat";
+    constexpr const char* FAVORITES_FILE = "/sdcard/meshtastic/favorites.dat";
+    constexpr const char* IGNORELIST_FILE = "/sdcard/meshtastic/ignorelist.dat";
 
     static constexpr size_t GREETING_MAX_LEN = 200;
 
@@ -252,6 +254,14 @@ namespace Mesh
         bool setFavorite(uint32_t node_id, bool favorite);
 
         /**
+         * @brief Set ignored status for a node (adds/removes from ignore list file)
+         * @param node_id Node ID
+         * @param ignored Ignored status
+         * @return true if updated
+         */
+        bool setIgnored(uint32_t node_id, bool ignored);
+
+        /**
          * @brief Get local preferences
          * @return Local config reference
          */
@@ -386,6 +396,24 @@ namespace Mesh
 
         static constexpr uint32_t SAVE_INTERVAL_MS = 30000; // Save every 30 seconds if dirty
     };
+
+    // Favorites file helpers (binary file of uint32_t node_ids)
+    size_t favorites_get_count();
+    bool favorites_load_range(size_t offset, size_t count, std::vector<uint32_t>& out);
+    bool favorites_contains(uint32_t node_id);
+    bool favorites_add(uint32_t node_id);
+    bool favorites_remove(uint32_t node_id);
+    bool favorites_remove_at(size_t index);
+    void favorites_clear();
+
+    // Ignore list file helpers (same binary format as favorites)
+    size_t ignorelist_get_count();
+    bool ignorelist_load_range(size_t offset, size_t count, std::vector<uint32_t>& out);
+    bool ignorelist_contains(uint32_t node_id);
+    bool ignorelist_add(uint32_t node_id);
+    bool ignorelist_remove(uint32_t node_id);
+    bool ignorelist_remove_at(size_t index);
+    void ignorelist_clear();
 
 } // namespace Mesh
 

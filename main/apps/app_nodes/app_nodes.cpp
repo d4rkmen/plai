@@ -32,12 +32,16 @@
 static const char* TAG = "APP_NODES";
 
 static const char* HINT_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [1..8.F.T.R.N.P][ENT][DEL][ESC]";
-static const char* HINT_LIST_FN = "[\u2191]HOME [\u2193]END [T]RACE";
+static const char* HINT_LIST_FN = "[\u2191]HOME [\u2193]END [T]RACE [F]AV";
 static const char* HINT_DM = "[Fn] [^] [\u2191][\u2193][\u2190][\u2192] [I] [ENTER][DEL] [ESC]";
 static const char* HINT_DM_FN = "[\u2191]HOME [\u2193]END";
 static const char* HINT_DETAIL = "[T]RACE [ENTER]DM [ESC]";
 static const char* HINT_TR_LOG = "[\u2191][\u2193][\u2190][\u2192] [ENTER] [T]RACE [ESC]";
 static const char* HINT_TR_DETAIL = "[\u2191][\u2193][\u2190][\u2192] [ESC]";
+static const char* HINT_FAV_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [DEL] [ESC]";
+static const char* HINT_FAV_LIST_FN = "[\u2191]HOME [\u2193]END [DEL]CLEAR ALL";
+static const char* HINT_IGN_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [DEL] [ESC]";
+static const char* HINT_IGN_LIST_FN = "[\u2191]HOME [\u2193]END [DEL]CLEAR ALL";
 
 // Sort order selection dialog
 static const std::vector<std::string> sort_labels = {
@@ -154,6 +158,12 @@ void AppNodes::onCreate()
     _data.dm_chars_per_line = 20;
     _data.selected_node_valid = false;
     _data.sort_order = Mesh::SortOrder::LAST_HEARD;
+    _data.fav_total_count = 0;
+    _data.fav_selected_index = 0;
+    _data.fav_scroll_offset = 0;
+    _data.ign_total_count = 0;
+    _data.ign_selected_index = 0;
+    _data.ign_scroll_offset = 0;
 
     // Initialize scrolling text context for node names (FONT_12)
     scroll_text_init_ex(&_data.name_scroll_ctx,
@@ -317,6 +327,26 @@ void AppNodes::onRunning()
             _data.hal->canvas_update();
         }
         _handle_traceroute_detail_input();
+        break;
+
+    case ViewState::FAVORITE_LIST:
+        updated |= _render_favorite_list();
+        updated |= _render_favorite_hint();
+        if (updated)
+        {
+            _data.hal->canvas_update();
+        }
+        _handle_favorite_list_input();
+        break;
+
+    case ViewState::IGNORE_LIST:
+        updated |= _render_ignore_list();
+        updated |= _render_ignore_hint();
+        if (updated)
+        {
+            _data.hal->canvas_update();
+        }
+        _handle_ignore_list_input();
         break;
     }
 }
@@ -813,9 +843,16 @@ bool AppNodes::_render_node_list()
         if (node.info.is_favorite)
         {
             // todo: use a favorite icon
-            canvas->setTextColor(is_selected ? THEME_COLOR_SELECTED : THEME_COLOR_FAVORITE,
+            canvas->setTextColor(node.info.is_ignored ? THEME_COLOR_IGNORED
+                                 : is_selected        ? THEME_COLOR_SELECTED
+                                                      : THEME_COLOR_FAVORITE,
                                  is_selected ? THEME_COLOR_BG_SELECTED : THEME_COLOR_BG);
             canvas->drawString("*", fav_x, y_offset + 1);
+        }
+        else if (node.info.is_ignored)
+        {
+            canvas->setTextColor(THEME_COLOR_IGNORED, is_selected ? THEME_COLOR_BG_SELECTED : THEME_COLOR_BG);
+            canvas->drawString("X", fav_x, y_offset + 1);
         }
 
         // 8. Unread messages indicator
@@ -1828,15 +1865,59 @@ void AppNodes::_handle_node_list_input()
             _data.hal->playNextSound();
             _data.hal->keyboard()->waitForRelease(KEY_NUM_F);
 
-            // Load the currently selected node first
-            if (_data.total_node_count > 0 && _data.hal->nodedb())
+            if (keys_state.fn)
+            {
+                // Open favorites list view
+                _data.fav_total_count = Mesh::favorites_get_count();
+                _data.fav_selected_index = 0;
+                _data.fav_scroll_offset = 0;
+                _data.view_state = ViewState::FAVORITE_LIST;
+                _data.update_list = true;
+            }
+            else if (_data.total_node_count > 0 && _data.hal->nodedb())
             {
                 Mesh::NodeInfo node;
                 if (_data.hal->nodedb()->getNodeByIndex(_data.selected_index, node))
                 {
-                    // Toggle favorite and save
                     bool new_favorite = !node.info.is_favorite;
                     _data.hal->nodedb()->setFavorite(node.info.num, new_favorite);
+                    if (new_favorite)
+                        Mesh::favorites_add(node.info.num);
+                    else
+                        Mesh::favorites_remove(node.info.num);
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_I))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_I);
+
+            if (keys_state.fn)
+            {
+                // Open ignore list view
+                _data.ign_total_count = Mesh::ignorelist_get_count();
+                _data.ign_selected_index = 0;
+                _data.ign_scroll_offset = 0;
+                _data.view_state = ViewState::IGNORE_LIST;
+                _data.update_list = true;
+            }
+            else if (_data.total_node_count > 0 && _data.hal->nodedb())
+            {
+                Mesh::NodeInfo node;
+                if (_data.hal->nodedb()->getNodeByIndex(_data.selected_index, node))
+                {
+                    bool new_ignored = !node.info.is_ignored;
+                    _data.hal->nodedb()->setIgnored(node.info.num, new_ignored);
+                    if (new_ignored)
+                    {
+                        Mesh::ignorelist_add(node.info.num);
+                    }
+                    else
+                    {
+                        Mesh::ignorelist_remove(node.info.num);
+                    }
                     _data.update_list = true;
                 }
             }
@@ -2744,6 +2825,538 @@ void AppNodes::_handle_traceroute_detail_input()
 }
 
 // ========== End Traceroute ==========
+
+// ========== Favorite List ==========
+
+bool AppNodes::_render_favorite_list()
+{
+    if (!_data.update_list)
+        return false;
+    _data.update_list = false;
+
+    auto* canvas = _data.hal->canvas();
+    canvas->fillScreen(THEME_COLOR_BG);
+    canvas->setFont(FONT_12);
+
+    // Header
+    canvas->setTextColor(TFT_ORANGE, THEME_COLOR_BG);
+    canvas->drawString("<", 2, 0);
+    canvas->drawString("Favorites", 14, 0);
+
+    _data.fav_total_count = Mesh::favorites_get_count();
+
+    std::string cnt_str = std::format("{}", (int)_data.fav_total_count);
+    canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
+    canvas->drawRightString(cnt_str.c_str(), canvas->width() - 2, 0);
+    canvas->drawFastHLine(0, 14, canvas->width(), THEME_COLOR_BG_SELECTED);
+
+    if (_data.fav_total_count == 0)
+    {
+        canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
+        canvas->drawCenterString("<empty. use [F] to add>", canvas->width() / 2, canvas->height() / 2 - 6);
+        return true;
+    }
+
+    // Clamp selection
+    if (_data.fav_selected_index >= (int)_data.fav_total_count)
+        _data.fav_selected_index = (int)_data.fav_total_count - 1;
+    if (_data.fav_selected_index < 0)
+        _data.fav_selected_index = 0;
+
+    const int item_y_start = 15;
+    const int max_visible = (canvas->height() - item_y_start - 9) / (LIST_ITEM_HEIGHT + 1);
+
+    // Adjust scroll to keep selection visible
+    if (_data.fav_selected_index < _data.fav_scroll_offset)
+        _data.fav_scroll_offset = _data.fav_selected_index;
+    if (_data.fav_selected_index >= _data.fav_scroll_offset + max_visible)
+        _data.fav_scroll_offset = _data.fav_selected_index - max_visible + 1;
+
+    // Load only visible node_ids from file
+    std::vector<uint32_t> visible_ids;
+    int vis_count = std::min(max_visible, (int)_data.fav_total_count - _data.fav_scroll_offset);
+    Mesh::favorites_load_range((size_t)_data.fav_scroll_offset, (size_t)vis_count, visible_ids);
+
+    auto* nodedb = _data.hal->nodedb();
+    const int id_col_width = 10 * 6 + 4; // "!xxxxxxxx" = 10 chars
+    const int name_x = id_col_width + 4;
+
+    int y = item_y_start;
+    for (int i = 0; i < (int)visible_ids.size(); i++)
+    {
+        int idx = _data.fav_scroll_offset + i;
+        uint32_t node_id = visible_ids[i];
+        bool selected = (idx == _data.fav_selected_index);
+
+        uint32_t bg = selected ? THEME_COLOR_BG_SELECTED : THEME_COLOR_BG;
+        uint32_t fg = selected ? THEME_COLOR_SELECTED : THEME_COLOR_UNSELECTED;
+
+        if (selected)
+            canvas->fillRect(2, y, canvas->width() - 4 - SCROLL_BAR_WIDTH, LIST_ITEM_HEIGHT, THEME_COLOR_BG_SELECTED);
+
+        // Column 1: node_id in !{:08x} format
+        std::string id_str = std::format("!{:08x}", (unsigned int)node_id);
+        canvas->setTextColor(selected ? THEME_COLOR_SELECTED : lgfx::v1::convert_to_rgb888(TFT_GOLD), bg);
+        canvas->drawString(id_str.c_str(), 4, y + 1);
+
+        // Column 2: longLabel from node_db if present, otherwise "<not found>"
+        std::string label = "<not found>";
+        if (nodedb)
+        {
+            Mesh::NodeInfo ni;
+            if (nodedb->getNode(node_id, ni))
+                label = Mesh::NodeDB::getLongLabel(ni);
+        }
+        canvas->setTextColor(fg, bg);
+        int max_label_w = canvas->width() - name_x - SCROLL_BAR_WIDTH - 4;
+        if (canvas->textWidth(label.c_str()) > max_label_w)
+        {
+            size_t trunc = utf8_truncate_len(label.c_str(), (size_t)(max_label_w / 6));
+            label = label.substr(0, trunc) + ">";
+        }
+        canvas->drawString(label.c_str(), name_x, y + 1);
+
+        y += LIST_ITEM_HEIGHT + 1;
+    }
+
+    // Scrollbar
+    UTILS::UI::draw_scrollbar(canvas,
+                              canvas->width() - SCROLL_BAR_WIDTH - 1,
+                              item_y_start,
+                              SCROLL_BAR_WIDTH,
+                              max_visible * (LIST_ITEM_HEIGHT + 1),
+                              (int)_data.fav_total_count,
+                              max_visible,
+                              _data.fav_scroll_offset,
+                              SCROLLBAR_MIN_HEIGHT);
+
+    return true;
+}
+
+bool AppNodes::_render_favorite_hint()
+{
+    static bool last_fn = false;
+    auto c = _data.hal->canvas();
+    auto keys_state = _data.hal->keyboard()->keysState();
+    if (last_fn != keys_state.fn)
+    {
+        last_fn = keys_state.fn;
+        c->fillRect(0, c->height() - 9, c->width(), 10, THEME_COLOR_BG);
+    }
+    return hl_text_render(&_data.hint_hl_ctx,
+                          last_fn ? HINT_FAV_LIST_FN : HINT_FAV_LIST,
+                          0,
+                          _data.hal->canvas()->height() - 9,
+                          TFT_DARKGREY,
+                          TFT_WHITE,
+                          THEME_COLOR_BG);
+}
+
+void AppNodes::_handle_favorite_list_input()
+{
+    _data.hal->keyboard()->updateKeyList();
+    _data.hal->keyboard()->updateKeysState();
+
+    if (_data.hal->keyboard()->isPressed())
+    {
+        uint32_t now = millis();
+        auto keys_state = _data.hal->keyboard()->keysState();
+
+        if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_ESC))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_ESC);
+            _data.view_state = ViewState::NODE_LIST;
+            _data.update_list = true;
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_BACKSPACE))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_BACKSPACE);
+
+            if (keys_state.fn)
+            {
+                // Clear all favorites
+                if (UTILS::UI::show_confirmation_dialog(_data.hal, "Favorites", "Clear all favorites?", "Clear", "Cancel"))
+                {
+                    Mesh::favorites_clear();
+                    // Also clear is_favorite flag on all nodes
+                    if (_data.hal->nodedb())
+                    {
+                        size_t cnt = _data.hal->nodedb()->getNodeCount();
+                        for (size_t i = 0; i < cnt; i++)
+                        {
+                            Mesh::NodeInfo ni;
+                            if (_data.hal->nodedb()->getNodeByIndex(i, ni) && ni.info.is_favorite)
+                                _data.hal->nodedb()->setFavorite(ni.info.num, false);
+                        }
+                    }
+                    _data.fav_selected_index = 0;
+                    _data.fav_scroll_offset = 0;
+                }
+            }
+            else
+            {
+                // Delete selected favorite
+                if (_data.fav_total_count > 0)
+                {
+                    std::vector<uint32_t> sel;
+                    Mesh::favorites_load_range((size_t)_data.fav_selected_index, 1, sel);
+                    if (!sel.empty())
+                    {
+                        uint32_t node_id = sel[0];
+                        std::string title = std::format("!{:08x}", (unsigned int)node_id);
+                        if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "Delete favorite?", "Delete", "Cancel"))
+                        {
+                            Mesh::favorites_remove_at((size_t)_data.fav_selected_index);
+                            auto* nodedb = _data.hal->nodedb();
+                            if (nodedb)
+                                nodedb->setFavorite(node_id, false);
+                            _data.fav_total_count = Mesh::favorites_get_count();
+                            if (_data.fav_selected_index >= (int)_data.fav_total_count && _data.fav_selected_index > 0)
+                                _data.fav_selected_index--;
+                        }
+                    }
+                }
+            }
+            _data.update_list = true;
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_DOWN))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                if (keys_state.fn)
+                {
+                    // Jump to end
+                    if (_data.fav_selected_index < (int)_data.fav_total_count - 1)
+                    {
+                        _data.fav_selected_index = (int)_data.fav_total_count - 1;
+                        _data.hal->playNextSound();
+                        _data.update_list = true;
+                    }
+                }
+                else if (_data.fav_selected_index < (int)_data.fav_total_count - 1)
+                {
+                    _data.fav_selected_index++;
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_UP))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                if (keys_state.fn)
+                {
+                    // Jump to start
+                    if (_data.fav_selected_index > 0)
+                    {
+                        _data.fav_selected_index = 0;
+                        _data.fav_scroll_offset = 0;
+                        _data.hal->playNextSound();
+                        _data.update_list = true;
+                    }
+                }
+                else if (_data.fav_selected_index > 0)
+                {
+                    _data.fav_selected_index--;
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_RIGHT))
+        {
+            // Page down
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                int page = (_data.hal->canvas()->height() - 15 - 9) / (LIST_ITEM_HEIGHT + 1);
+                int last = (int)_data.fav_total_count - 1;
+                if (_data.fav_selected_index < last)
+                {
+                    _data.fav_selected_index = std::min(_data.fav_selected_index + page, last);
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_LEFT))
+        {
+            // Page up
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.fav_selected_index > 0)
+            {
+                int page = (_data.hal->canvas()->height() - 15 - 9) / (LIST_ITEM_HEIGHT + 1);
+                _data.fav_selected_index = std::max(_data.fav_selected_index - page, 0);
+                _data.hal->playNextSound();
+                _data.update_list = true;
+            }
+        }
+    }
+    else
+    {
+        is_repeat = false;
+    }
+}
+
+// ========== End Favorite List ==========
+
+// ========== Ignore List ==========
+
+bool AppNodes::_render_ignore_list()
+{
+    if (!_data.update_list)
+        return false;
+    _data.update_list = false;
+
+    auto* canvas = _data.hal->canvas();
+    canvas->fillScreen(THEME_COLOR_BG);
+    canvas->setFont(FONT_12);
+
+    // Header
+    canvas->setTextColor(TFT_ORANGE, THEME_COLOR_BG);
+    canvas->drawString("<", 2, 0);
+    canvas->drawString("Ignore list", 14, 0);
+
+    _data.ign_total_count = Mesh::ignorelist_get_count();
+
+    std::string cnt_str = std::format("{}", (int)_data.ign_total_count);
+    canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
+    canvas->drawRightString(cnt_str.c_str(), canvas->width() - 2, 0);
+    canvas->drawFastHLine(0, 14, canvas->width(), THEME_COLOR_BG_SELECTED);
+
+    if (_data.ign_total_count == 0)
+    {
+        canvas->setTextColor(TFT_DARKGREY, THEME_COLOR_BG);
+        canvas->drawCenterString("<empty. use [I] to add>", canvas->width() / 2, canvas->height() / 2 - 6);
+        return true;
+    }
+
+    // Clamp selection
+    if (_data.ign_selected_index >= (int)_data.ign_total_count)
+        _data.ign_selected_index = (int)_data.ign_total_count - 1;
+    if (_data.ign_selected_index < 0)
+        _data.ign_selected_index = 0;
+
+    const int item_y_start = 15;
+    const int max_visible = (canvas->height() - item_y_start - 9) / (LIST_ITEM_HEIGHT + 1);
+
+    // Adjust scroll to keep selection visible
+    if (_data.ign_selected_index < _data.ign_scroll_offset)
+        _data.ign_scroll_offset = _data.ign_selected_index;
+    if (_data.ign_selected_index >= _data.ign_scroll_offset + max_visible)
+        _data.ign_scroll_offset = _data.ign_selected_index - max_visible + 1;
+
+    // Load only visible node_ids from file
+    std::vector<uint32_t> visible_ids;
+    int vis_count = std::min(max_visible, (int)_data.ign_total_count - _data.ign_scroll_offset);
+    Mesh::ignorelist_load_range((size_t)_data.ign_scroll_offset, (size_t)vis_count, visible_ids);
+
+    auto* nodedb = _data.hal->nodedb();
+    const int id_col_width = 10 * 6 + 4; // "!xxxxxxxx" = 10 chars
+    const int name_x = id_col_width + 4;
+
+    int y = item_y_start;
+    for (int i = 0; i < (int)visible_ids.size(); i++)
+    {
+        int idx = _data.ign_scroll_offset + i;
+        uint32_t node_id = visible_ids[i];
+        bool selected = (idx == _data.ign_selected_index);
+
+        uint32_t bg = selected ? THEME_COLOR_BG_SELECTED : THEME_COLOR_BG;
+        uint32_t fg = selected ? THEME_COLOR_SELECTED : THEME_COLOR_UNSELECTED;
+
+        if (selected)
+            canvas->fillRect(2, y, canvas->width() - 4 - SCROLL_BAR_WIDTH, LIST_ITEM_HEIGHT, THEME_COLOR_BG_SELECTED);
+
+        // Column 1: node_id in !{:08x} format
+        std::string id_str = std::format("!{:08x}", (unsigned int)node_id);
+        canvas->setTextColor(selected ? THEME_COLOR_SELECTED : lgfx::v1::convert_to_rgb888(TFT_RED), bg);
+        canvas->drawString(id_str.c_str(), 4, y + 1);
+
+        // Column 2: longLabel from node_db if present, otherwise "<not found>"
+        std::string label = "<not found>";
+        if (nodedb)
+        {
+            Mesh::NodeInfo ni;
+            if (nodedb->getNode(node_id, ni))
+                label = Mesh::NodeDB::getLongLabel(ni);
+        }
+        canvas->setTextColor(fg, bg);
+        int max_label_w = canvas->width() - name_x - SCROLL_BAR_WIDTH - 4;
+        if (canvas->textWidth(label.c_str()) > max_label_w)
+        {
+            size_t trunc = utf8_truncate_len(label.c_str(), (size_t)(max_label_w / 6));
+            label = label.substr(0, trunc) + ">";
+        }
+        canvas->drawString(label.c_str(), name_x, y + 1);
+
+        y += LIST_ITEM_HEIGHT + 1;
+    }
+
+    // Scrollbar
+    UTILS::UI::draw_scrollbar(canvas,
+                              canvas->width() - SCROLL_BAR_WIDTH - 1,
+                              item_y_start,
+                              SCROLL_BAR_WIDTH,
+                              max_visible * (LIST_ITEM_HEIGHT + 1),
+                              (int)_data.ign_total_count,
+                              max_visible,
+                              _data.ign_scroll_offset,
+                              SCROLLBAR_MIN_HEIGHT);
+
+    return true;
+}
+
+bool AppNodes::_render_ignore_hint()
+{
+    static bool last_fn = false;
+    auto c = _data.hal->canvas();
+    auto keys_state = _data.hal->keyboard()->keysState();
+    if (last_fn != keys_state.fn)
+    {
+        last_fn = keys_state.fn;
+        c->fillRect(0, c->height() - 9, c->width(), 10, THEME_COLOR_BG);
+    }
+    return hl_text_render(&_data.hint_hl_ctx,
+                          last_fn ? HINT_IGN_LIST_FN : HINT_IGN_LIST,
+                          0,
+                          _data.hal->canvas()->height() - 9,
+                          TFT_DARKGREY,
+                          TFT_WHITE,
+                          THEME_COLOR_BG);
+}
+
+void AppNodes::_handle_ignore_list_input()
+{
+    _data.hal->keyboard()->updateKeyList();
+    _data.hal->keyboard()->updateKeysState();
+
+    if (_data.hal->keyboard()->isPressed())
+    {
+        uint32_t now = millis();
+        auto keys_state = _data.hal->keyboard()->keysState();
+
+        if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_ESC))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_ESC);
+            _data.view_state = ViewState::NODE_LIST;
+            _data.update_list = true;
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_BACKSPACE))
+        {
+            _data.hal->playNextSound();
+            _data.hal->keyboard()->waitForRelease(KEY_NUM_BACKSPACE);
+
+            if (keys_state.fn)
+            {
+                // Clear all ignored
+                if (UTILS::UI::show_confirmation_dialog(_data.hal, "Ignore list", "Clear ignore list?", "Clear", "Cancel"))
+                {
+                    Mesh::ignorelist_clear();
+                    _data.ign_selected_index = 0;
+                    _data.ign_scroll_offset = 0;
+                }
+            }
+            else
+            {
+                // Delete selected ignored node
+                if (_data.ign_total_count > 0)
+                {
+                    std::vector<uint32_t> sel;
+                    Mesh::ignorelist_load_range((size_t)_data.ign_selected_index, 1, sel);
+                    if (!sel.empty())
+                    {
+                        uint32_t node_id = sel[0];
+                        std::string title = std::format("!{:08x}", (unsigned int)node_id);
+                        if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "Remove from ignored?", "Delete", "Cancel"))
+                        {
+                            Mesh::ignorelist_remove_at((size_t)_data.ign_selected_index);
+                            _data.ign_total_count = Mesh::ignorelist_get_count();
+                            if (_data.ign_selected_index >= (int)_data.ign_total_count && _data.ign_selected_index > 0)
+                                _data.ign_selected_index--;
+                        }
+                    }
+                }
+            }
+            _data.update_list = true;
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_DOWN))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                if (keys_state.fn)
+                {
+                    if (_data.ign_selected_index < (int)_data.ign_total_count - 1)
+                    {
+                        _data.ign_selected_index = (int)_data.ign_total_count - 1;
+                        _data.hal->playNextSound();
+                        _data.update_list = true;
+                    }
+                }
+                else if (_data.ign_selected_index < (int)_data.ign_total_count - 1)
+                {
+                    _data.ign_selected_index++;
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_UP))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                if (keys_state.fn)
+                {
+                    if (_data.ign_selected_index > 0)
+                    {
+                        _data.ign_selected_index = 0;
+                        _data.ign_scroll_offset = 0;
+                        _data.hal->playNextSound();
+                        _data.update_list = true;
+                    }
+                }
+                else if (_data.ign_selected_index > 0)
+                {
+                    _data.ign_selected_index--;
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_RIGHT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now))
+            {
+                int page = (_data.hal->canvas()->height() - 15 - 9) / (LIST_ITEM_HEIGHT + 1);
+                int last = (int)_data.ign_total_count - 1;
+                if (_data.ign_selected_index < last)
+                {
+                    _data.ign_selected_index = std::min(_data.ign_selected_index + page, last);
+                    _data.hal->playNextSound();
+                    _data.update_list = true;
+                }
+            }
+        }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_LEFT))
+        {
+            if (key_repeat_check(is_repeat, next_fire_ts, now) && _data.ign_selected_index > 0)
+            {
+                int page = (_data.hal->canvas()->height() - 15 - 9) / (LIST_ITEM_HEIGHT + 1);
+                _data.ign_selected_index = std::max(_data.ign_selected_index - page, 0);
+                _data.hal->playNextSound();
+                _data.update_list = true;
+            }
+        }
+    }
+    else
+    {
+        is_repeat = false;
+    }
+}
+
+// ========== End Ignore List ==========
 
 void AppNodes::_send_message(const std::string& text)
 {

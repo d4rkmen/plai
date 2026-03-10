@@ -45,7 +45,9 @@ namespace MOONCAKE::APPS
             NODE_DETAIL,
             DIRECT_MESSAGE,
             TRACEROUTE_LOG,
-            TRACEROUTE_DETAIL
+            TRACEROUTE_DETAIL,
+            FAVORITE_LIST,
+            IGNORE_LIST
         };
 
     private:
@@ -81,6 +83,16 @@ namespace MOONCAKE::APPS
             int tr_detail_scroll;                           // Scroll offset in detail view
             Mesh::TraceRouteResult tr_detail_result;        // Loaded detail for selected item
 
+            // Favorite list state (file-backed, only visible items loaded)
+            size_t fav_total_count;
+            int fav_selected_index;
+            int fav_scroll_offset;
+
+            // Ignore list state (file-backed, only visible items loaded)
+            size_t ign_total_count;
+            int ign_selected_index;
+            int ign_scroll_offset;
+
             // Sorting
             Mesh::SortOrder sort_order;
 
@@ -107,6 +119,10 @@ namespace MOONCAKE::APPS
         bool _render_traceroute_detail();
         bool _render_traceroute_hint();
         bool _render_traceroute_detail_hint();
+        bool _render_favorite_list();
+        bool _render_favorite_hint();
+        bool _render_ignore_list();
+        bool _render_ignore_hint();
 
         // Input handling
         void _handle_node_list_input();
@@ -114,6 +130,8 @@ namespace MOONCAKE::APPS
         void _handle_dm_input();
         void _handle_traceroute_log_input();
         void _handle_traceroute_detail_input();
+        void _handle_favorite_list_input();
+        void _handle_ignore_list_input();
 
         // Traceroute helpers
         void _start_traceroute();

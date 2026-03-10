@@ -93,6 +93,25 @@ namespace Mesh
         // Sort index by default order
         sortIndex(SortOrder::LAST_HEARD);
 
+        // Migrate favorites: if file is missing, populate from existing is_favorite flags
+        {
+            struct stat fav_st;
+            if (stat(FAVORITES_FILE, &fav_st) != 0)
+            {
+                int migrated = 0;
+                for (const auto& entry : _index)
+                {
+                    if (entry.is_favorite)
+                    {
+                        favorites_add(entry.node_id);
+                        migrated++;
+                    }
+                }
+                if (migrated > 0)
+                    ESP_LOGI(TAG, "Migrated %d favorites to %s", migrated, FAVORITES_FILE);
+            }
+        }
+
         _initialized = true;
         ESP_LOGI(TAG, "Node database initialized with %d nodes", _index.size());
         return true;
@@ -472,6 +491,7 @@ namespace Mesh
         entry.last_heard = node.info.last_heard;
         entry.last_rssi = node.last_rssi;
         entry.is_favorite = node.info.is_favorite;
+
         entry.exists = true;
         // Sort-relevant fields
         memset(entry.short_name, 0, sizeof(entry.short_name));
@@ -859,8 +879,10 @@ namespace Mesh
         {
             // Update existing node - preserve is_favorite
             bool was_favorite = full_node.info.is_favorite;
+            bool was_ignored = full_node.info.is_ignored;
             full_node.info = node;
             full_node.info.is_favorite = was_favorite;
+            full_node.info.is_ignored = was_ignored;
             full_node.info.last_heard = (uint32_t)time(nullptr);
             if (rssi != -1)
             {
@@ -876,7 +898,8 @@ namespace Mesh
             full_node.info.last_heard = (uint32_t)time(nullptr);
             full_node.last_rssi = (rssi != -1) ? rssi : 0;
             full_node.info.snr = snr;
-            full_node.info.is_favorite = false;
+            full_node.info.is_favorite = favorites_contains(node.num);
+            full_node.info.is_ignored = ignorelist_contains(node.num);
             full_node.relay_node = relay_node;
         }
 
@@ -993,6 +1016,19 @@ namespace Mesh
             return true;
         }
         return false;
+    }
+
+    bool NodeDB::setIgnored(uint32_t node_id, bool ignored)
+    {
+        NodeInfo node = {};
+        if (!loadNodeFromFile(node_id, node))
+        {
+            return false;
+        }
+
+        node.info.is_ignored = ignored;
+
+        return saveNodeToFile(node);
     }
 
     //--------------------------------------------------------------------------
@@ -1217,5 +1253,277 @@ namespace Mesh
             save();
         }
     }
+
+    // ========== Favorites file helpers ==========
+
+    size_t favorites_get_count()
+    {
+        FILE* f = fopen(FAVORITES_FILE, "rb");
+        if (!f)
+            return 0;
+        fseek(f, 0, SEEK_END);
+        size_t sz = ftell(f);
+        fclose(f);
+        return sz / sizeof(uint32_t);
+    }
+
+    bool favorites_load_range(size_t offset, size_t count, std::vector<uint32_t>& out)
+    {
+        out.clear();
+        FILE* f = fopen(FAVORITES_FILE, "rb");
+        if (!f)
+            return false;
+        fseek(f, 0, SEEK_END);
+        size_t total = ftell(f) / sizeof(uint32_t);
+        if (offset >= total)
+        {
+            fclose(f);
+            return true;
+        }
+        size_t avail = total - offset;
+        if (count > avail)
+            count = avail;
+        out.resize(count);
+        fseek(f, (long)(offset * sizeof(uint32_t)), SEEK_SET);
+        size_t rd = fread(out.data(), sizeof(uint32_t), count, f);
+        fclose(f);
+        out.resize(rd);
+        return true;
+    }
+
+    bool favorites_contains(uint32_t node_id)
+    {
+        FILE* f = fopen(FAVORITES_FILE, "rb");
+        if (!f)
+            return false;
+        uint32_t id;
+        while (fread(&id, sizeof(id), 1, f) == 1)
+        {
+            if (id == node_id)
+            {
+                fclose(f);
+                return true;
+            }
+        }
+        fclose(f);
+        return false;
+    }
+
+    bool favorites_add(uint32_t node_id)
+    {
+        if (favorites_contains(node_id))
+            return true;
+        FILE* f = fopen(FAVORITES_FILE, "ab");
+        if (!f)
+            return false;
+        bool ok = fwrite(&node_id, sizeof(node_id), 1, f) == 1;
+        fclose(f);
+        return ok;
+    }
+
+    bool favorites_remove(uint32_t node_id)
+    {
+        FILE* f = fopen(FAVORITES_FILE, "rb");
+        if (!f)
+            return false;
+        fseek(f, 0, SEEK_END);
+        size_t total = ftell(f) / sizeof(uint32_t);
+        if (total == 0)
+        {
+            fclose(f);
+            return false;
+        }
+        fseek(f, 0, SEEK_SET);
+        std::vector<uint32_t> ids(total);
+        fread(ids.data(), sizeof(uint32_t), total, f);
+        fclose(f);
+
+        auto it = std::find(ids.begin(), ids.end(), node_id);
+        if (it == ids.end())
+            return false;
+        ids.erase(it);
+
+        if (ids.empty())
+        {
+            ::remove(FAVORITES_FILE);
+            return true;
+        }
+        f = fopen(FAVORITES_FILE, "wb");
+        if (!f)
+            return false;
+        fwrite(ids.data(), sizeof(uint32_t), ids.size(), f);
+        fclose(f);
+        return true;
+    }
+
+    bool favorites_remove_at(size_t index)
+    {
+        FILE* f = fopen(FAVORITES_FILE, "rb");
+        if (!f)
+            return false;
+        fseek(f, 0, SEEK_END);
+        size_t total = ftell(f) / sizeof(uint32_t);
+        if (index >= total)
+        {
+            fclose(f);
+            return false;
+        }
+        fseek(f, 0, SEEK_SET);
+        std::vector<uint32_t> ids(total);
+        fread(ids.data(), sizeof(uint32_t), total, f);
+        fclose(f);
+
+        ids.erase(ids.begin() + (int)index);
+
+        if (ids.empty())
+        {
+            ::remove(FAVORITES_FILE);
+            return true;
+        }
+        f = fopen(FAVORITES_FILE, "wb");
+        if (!f)
+            return false;
+        fwrite(ids.data(), sizeof(uint32_t), ids.size(), f);
+        fclose(f);
+        return true;
+    }
+
+    void favorites_clear() { ::remove(FAVORITES_FILE); }
+
+    // ========== Ignore list file helpers ==========
+
+    size_t ignorelist_get_count()
+    {
+        FILE* f = fopen(IGNORELIST_FILE, "rb");
+        if (!f)
+            return 0;
+        fseek(f, 0, SEEK_END);
+        size_t sz = ftell(f);
+        fclose(f);
+        return sz / sizeof(uint32_t);
+    }
+
+    bool ignorelist_load_range(size_t offset, size_t count, std::vector<uint32_t>& out)
+    {
+        out.clear();
+        FILE* f = fopen(IGNORELIST_FILE, "rb");
+        if (!f)
+            return false;
+        fseek(f, 0, SEEK_END);
+        size_t total = ftell(f) / sizeof(uint32_t);
+        if (offset >= total)
+        {
+            fclose(f);
+            return true;
+        }
+        size_t avail = total - offset;
+        if (count > avail)
+            count = avail;
+        out.resize(count);
+        fseek(f, (long)(offset * sizeof(uint32_t)), SEEK_SET);
+        size_t rd = fread(out.data(), sizeof(uint32_t), count, f);
+        fclose(f);
+        out.resize(rd);
+        return true;
+    }
+
+    bool ignorelist_contains(uint32_t node_id)
+    {
+        FILE* f = fopen(IGNORELIST_FILE, "rb");
+        if (!f)
+            return false;
+        uint32_t id;
+        while (fread(&id, sizeof(id), 1, f) == 1)
+        {
+            if (id == node_id)
+            {
+                fclose(f);
+                return true;
+            }
+        }
+        fclose(f);
+        return false;
+    }
+
+    bool ignorelist_add(uint32_t node_id)
+    {
+        if (ignorelist_contains(node_id))
+            return true;
+        FILE* f = fopen(IGNORELIST_FILE, "ab");
+        if (!f)
+            return false;
+        bool ok = fwrite(&node_id, sizeof(node_id), 1, f) == 1;
+        fclose(f);
+        return ok;
+    }
+
+    bool ignorelist_remove(uint32_t node_id)
+    {
+        FILE* f = fopen(IGNORELIST_FILE, "rb");
+        if (!f)
+            return false;
+        fseek(f, 0, SEEK_END);
+        size_t total = ftell(f) / sizeof(uint32_t);
+        if (total == 0)
+        {
+            fclose(f);
+            return false;
+        }
+        fseek(f, 0, SEEK_SET);
+        std::vector<uint32_t> ids(total);
+        fread(ids.data(), sizeof(uint32_t), total, f);
+        fclose(f);
+
+        auto it = std::find(ids.begin(), ids.end(), node_id);
+        if (it == ids.end())
+            return false;
+        ids.erase(it);
+
+        if (ids.empty())
+        {
+            ::remove(IGNORELIST_FILE);
+            return true;
+        }
+        f = fopen(IGNORELIST_FILE, "wb");
+        if (!f)
+            return false;
+        fwrite(ids.data(), sizeof(uint32_t), ids.size(), f);
+        fclose(f);
+        return true;
+    }
+
+    bool ignorelist_remove_at(size_t index)
+    {
+        FILE* f = fopen(IGNORELIST_FILE, "rb");
+        if (!f)
+            return false;
+        fseek(f, 0, SEEK_END);
+        size_t total = ftell(f) / sizeof(uint32_t);
+        if (index >= total)
+        {
+            fclose(f);
+            return false;
+        }
+        fseek(f, 0, SEEK_SET);
+        std::vector<uint32_t> ids(total);
+        fread(ids.data(), sizeof(uint32_t), total, f);
+        fclose(f);
+
+        ids.erase(ids.begin() + (int)index);
+
+        if (ids.empty())
+        {
+            ::remove(IGNORELIST_FILE);
+            return true;
+        }
+        f = fopen(IGNORELIST_FILE, "wb");
+        if (!f)
+            return false;
+        fwrite(ids.data(), sizeof(uint32_t), ids.size(), f);
+        fclose(f);
+        return true;
+    }
+
+    void ignorelist_clear() { ::remove(IGNORELIST_FILE); }
 
 } // namespace Mesh
