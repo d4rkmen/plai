@@ -91,15 +91,19 @@ extern "C" void app_main(void)
     // Main loop
     while (1)
     {
-        // Update UI framework
-        mooncake.update();
 
         // Update mesh service (process BLE/radio events)
         hal.updateMesh();
-
-        // When display is sleeping, reduce CPU wake frequency to save power.
-        // LoRa DIO1 ISR still fires asynchronously and packets are processed
-        // on the next loop iteration (within ~100ms worst case).
-        vTaskDelay(hal.isDisplaySleeping() ? pdMS_TO_TICKS(100) : 1);
+        if (hal.isDisplaySleeping())
+        {
+            hal.keyboard()->updateKeyList();
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        else
+        {
+            // Update UI framework
+            mooncake.update();
+            vTaskDelay(1);
+        }
     }
 }
