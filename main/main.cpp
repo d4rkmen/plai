@@ -88,6 +88,14 @@ extern "C" void app_main(void)
     // Create launcher
     mooncake.createApp(launcher);
 
+    // Register main task for interrupt-driven wakeup during sleep
+    TaskHandle_t main_task = xTaskGetCurrentTaskHandle();
+    hal.keyboard()->setNotifyTask(main_task);
+#if HAL_USE_RADIO
+    if (hal.radio())
+        hal.radio()->setNotifyTask(main_task);
+#endif
+
     // Main loop
     while (1)
     {
@@ -97,7 +105,7 @@ extern "C" void app_main(void)
         if (hal.isDisplaySleeping())
         {
             hal.keyboard()->updateKeyList();
-            vTaskDelay(pdMS_TO_TICKS(100));
+            xTaskNotifyWait(0, UINT32_MAX, NULL, pdMS_TO_TICKS(1000));
         }
         else
         {

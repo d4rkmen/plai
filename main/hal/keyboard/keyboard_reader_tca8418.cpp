@@ -55,6 +55,12 @@ namespace KEYBOARD
     {
         TCA8418KeyboardReader* reader = static_cast<TCA8418KeyboardReader*>(arg);
         reader->_isr_flag = true;
+        if (reader->_notify_task)
+        {
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xTaskNotifyFromISR(reader->_notify_task, 1, eSetBits, &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
     }
 
     void TCA8418KeyboardReader::init()

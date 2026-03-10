@@ -9,6 +9,8 @@
 #pragma once
 #include <vector>
 #include <stdint.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace KEYBOARD
 {
@@ -57,8 +59,15 @@ namespace KEYBOARD
          */
         inline const std::vector<Point2D_t>& keyList() const { return _key_list; }
 
+        /**
+         * @brief Set task handle to notify on interrupt events
+         * @param task Task handle to wake via xTaskNotifyFromISR
+         */
+        void setNotifyTask(TaskHandle_t task) { _notify_task = task; }
+
     protected:
         std::vector<Point2D_t> _key_list;
+        TaskHandle_t _notify_task = nullptr;
     };
 
 } // namespace KEYBOARD

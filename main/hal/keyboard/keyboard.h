@@ -327,5 +327,10 @@ namespace KEYBOARD
         void set_dim_time(uint32_t ms);
         inline uint8_t isPressed() const { return static_cast<uint8_t>(keyList().size()); }
         inline HAL::BoardType boardType() const { return _board_type; }
+        void setNotifyTask(TaskHandle_t task)
+        {
+            if (_keyboard_reader)
+                _keyboard_reader->setNotifyTask(task);
+        }
     };
 } // namespace KEYBOARD

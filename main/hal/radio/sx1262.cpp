@@ -1248,6 +1248,12 @@ namespace HAL
     {
         SX1262* radio = static_cast<SX1262*>(arg);
         radio->_irq_pending = true;
+        if (radio->_notify_task)
+        {
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xTaskNotifyFromISR(radio->_notify_task, 1, eSetBits, &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
     }
 
     void SX1262::handleDio1Interrupt()

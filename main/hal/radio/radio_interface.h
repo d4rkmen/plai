@@ -15,6 +15,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <functional>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace HAL
 {
@@ -204,6 +206,15 @@ namespace HAL
          * @return Name string
          */
         virtual const char* getName() const = 0;
+
+        /**
+         * @brief Set task handle to notify on radio interrupt events
+         * @param task Task handle to wake via xTaskNotifyFromISR
+         */
+        void setNotifyTask(TaskHandle_t task) { _notify_task = task; }
+
+    protected:
+        TaskHandle_t _notify_task = nullptr;
     };
 
 } // namespace HAL
