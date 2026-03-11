@@ -18,6 +18,7 @@ Most Meshtastic nodes rely on a phone via BLE or WiFi. Plai takes a different ap
 - **Pro navigation** — PgUp / PgDown / Home / End for fast scrolling through long threads and node lists.
 - **Debug tools** — Built-in Packet Monitor (last 50 packets) and Trace Route history (last 50 attempts per node).
 - **Custom alerts** — Individual channel notifications with distinct sounds.
+- **Display sleep** — Screen turns off when idle to save power; wake on keypress or radio activity.
 - **Fully compatible** with Meshtastic network v2.7+
 - **Ping auto-reply**: respond automatically when someone #ping's the channel
 - **New node greetings**: send a welcome broadcast to the channel and/or a Direct Message when a new node appears
@@ -34,11 +35,14 @@ Full node management with up to 1000 nodes persisted on SD card.
 </p>
 
 - Node list with signal strength, hops, battery, role, encryption indicators
-- 8 sorting modes (name, role, signal, hops, last heard, favorites, etc.) _hotkey_ for sorting [1..8], [TAB] to select sorting mode
+- 8 sorting modes (name, role, signal, hops, last heard, favorites first, etc.) _hotkey_ for sorting [1..8], [TAB] to select sorting mode
 - Relay node display — see which node relayed each packet _hotkey_ [R] to jump to relay node
 - Favorite marking and quick-jump navigation _hotkey_ [F] to toggle favorite
+- Ignore nodes — mark nodes as ignored to filter their traffic _hotkey_ [I] to toggle ignored
 - Node detail view with hardware model, position, and metrics _hotkey_ [Fn] + [ENTER] to open
 - Direct Messages _hotkey_ [ENTER] to open
+- Exchange node info _hotkey_ [N] — send node info request to selected node
+- Exchange position _hotkey_ [P] — send position request to selected node
 - Traceroute _hotkey_ [T] to open recent traceroute logs. [Fn] + [T] to start traceroute immediately
 
 #### Direct Messages
@@ -66,6 +70,26 @@ Full node management with up to 1000 nodes persisted on SD card.
 - Last 50 traceroute attempts stored per node
 - Visual route map with color-coded signal quality
 - Press [T] to start new traceroute
+
+#### Favorites list
+
+Dedicated view of all your favorite nodes, stored persistently on SD card (`favorites.dat`).
+
+- **Open** — [Fn] + [F] from node list
+- **Add/remove** — [F] on a node in the main list toggles favorite status (shown in gold)
+- **Navigation** — Arrow keys, [PgUp]/[PgDown] for page scroll, [Fn]+[↑] Home / [Fn]+[↓] End
+- **Jump to node** — [ENTER] selects the highlighted favorite and returns to node list with that node focused
+- **Remove** — [DEL] removes the selected favorite; [Fn]+[DEL] clears all favorites
+- Favorites survive node database resets and firmware updates (file-backed)
+
+#### Ignore list
+
+Manage ignored nodes whose traffic is filtered at the mesh layer. Packets from ignored nodes are dropped before processing.
+
+- **Open** — [Fn] + [I] from node list
+- **Add/remove** — [I] on a node in the main list toggles ignored status (shown in red)
+- Same navigation and shortcuts as favorites — [ENTER] jump to node, [DEL] remove selected, [Fn]+[DEL] clear all
+- Ignored nodes stored in `ignorelist.dat` on SD; survives resets and updates
 
 ### Channels
 
