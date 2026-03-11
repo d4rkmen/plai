@@ -466,6 +466,18 @@ namespace Mesh
         _instance = nullptr;
     }
 
+    uint8_t MeshService::getChannelHash(const meshtastic_ChannelSettings& settings) const
+    {
+        uint8_t key[32] = {};
+        size_t key_len = 0;
+        bool no_crypto = false;
+        expandChannelPsk(settings, key, key_len, no_crypto);
+
+        uint8_t hash = 0;
+        computeChannelHashFromSettings(settings, _config, key, key_len, hash);
+        return hash;
+    }
+
     bool MeshService::init(HAL::RadioInterface* radio, NodeDB* nodedb, const MeshConfig& config)
     {
         ESP_LOGI(TAG, "Initializing mesh service");

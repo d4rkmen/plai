@@ -881,6 +881,16 @@ bool AppChannels::_render_channel_list()
                              is_selected ? THEME_COLOR_BG_SELECTED : THEME_COLOR_BG);
         canvas->drawString(mc.settings.name, name_x, y_offset + 1);
 
+        // Channel hash
+        if (_data.hal->mesh())
+        {
+            uint8_t ch_hash = _data.hal->mesh()->getChannelHash(mc.settings);
+            canvas->setTextColor(is_selected ? THEME_COLOR_SELECTED : THEME_COLOR_CHANNEL_HASH,
+                                 is_selected ? THEME_COLOR_BG_SELECTED : THEME_COLOR_BG);
+            int name_width = canvas->textWidth(mc.settings.name);
+            canvas->drawString(std::format("#{:02X}", ch_hash).c_str(), name_x + name_width + 4, y_offset + 1);
+        }
+
         // Right-side indicators area (before scrollbar)
         int right_x = panel_x + panel_width - SCROLL_BAR_WIDTH - 2;
 

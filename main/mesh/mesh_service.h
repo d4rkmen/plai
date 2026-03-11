@@ -251,6 +251,13 @@ namespace Mesh
         uint32_t getNodeId() const { return _config.node_id; }
 
         /**
+         * @brief Compute channel hash byte for a given channel's settings
+         * @param settings Channel settings
+         * @return Channel hash byte
+         */
+        uint8_t getChannelHash(const meshtastic_ChannelSettings& settings) const;
+
+        /**
          * @brief Get mesh configuration
          * @return Config reference
          */
