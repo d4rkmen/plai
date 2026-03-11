@@ -31,16 +31,16 @@
 
 static const char* TAG = "APP_NODES";
 
-static const char* HINT_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [1..8.F.T.R.N.P][ENT][DEL][ESC]";
+static const char* HINT_LIST = "[Fn][\u2191][\u2193][\u2190][\u2192][1..8.F.I.T.R.N.P][ENT][DEL][ESC]";
 static const char* HINT_LIST_FN = "[\u2191]HOME [\u2193]END [T]RACE [F]AV";
 static const char* HINT_DM = "[Fn] [^] [\u2191][\u2193][\u2190][\u2192] [I] [ENTER][DEL] [ESC]";
 static const char* HINT_DM_FN = "[\u2191]HOME [\u2193]END";
 static const char* HINT_DETAIL = "[T]RACE [ENTER]DM [ESC]";
 static const char* HINT_TR_LOG = "[\u2191][\u2193][\u2190][\u2192] [ENTER] [T]RACE [ESC]";
 static const char* HINT_TR_DETAIL = "[\u2191][\u2193][\u2190][\u2192] [ESC]";
-static const char* HINT_FAV_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [DEL] [ESC]";
+static const char* HINT_FAV_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [DEL] [ESC] [ENTER]";
 static const char* HINT_FAV_LIST_FN = "[\u2191]HOME [\u2193]END [DEL]CLEAR ALL";
-static const char* HINT_IGN_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [DEL] [ESC]";
+static const char* HINT_IGN_LIST = "[Fn] [\u2191][\u2193][\u2190][\u2192] [DEL] [ESC] [ENTER]";
 static const char* HINT_IGN_LIST_FN = "[\u2191]HOME [\u2193]END [DEL]CLEAR ALL";
 
 // Sort order selection dialog
@@ -2969,6 +2969,32 @@ void AppNodes::_handle_favorite_list_input()
             _data.view_state = ViewState::NODE_LIST;
             _data.update_list = true;
         }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_ENTER))
+        {
+            // For found nodes only: switch to node list and focus on selected
+            if (_data.fav_total_count > 0)
+            {
+                std::vector<uint32_t> sel;
+                Mesh::favorites_load_range((size_t)_data.fav_selected_index, 1, sel);
+                if (!sel.empty())
+                {
+                    uint32_t node_id = sel[0];
+                    auto* nodedb = _data.hal->nodedb();
+                    if (nodedb)
+                    {
+                        Mesh::NodeInfo ni;
+                        if (nodedb->getNode(node_id, ni))
+                        {
+                            _data.hal->playNextSound();
+                            _data.hal->keyboard()->waitForRelease(KEY_NUM_ENTER);
+                            _data.list_selected_node_id = node_id;
+                            _data.view_state = ViewState::NODE_LIST;
+                            _data.update_list = true;
+                        }
+                    }
+                }
+            }
+        }
         else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_BACKSPACE))
         {
             _data.hal->playNextSound();
@@ -2979,16 +3005,28 @@ void AppNodes::_handle_favorite_list_input()
                 // Clear all favorites
                 if (UTILS::UI::show_confirmation_dialog(_data.hal, "Favorites", "Clear all favorites?", "Clear", "Cancel"))
                 {
+                    size_t total = Mesh::favorites_get_count();
                     Mesh::favorites_clear();
                     // Also clear is_favorite flag on all nodes
-                    if (_data.hal->nodedb())
+                    if (_data.hal->nodedb() && total > 0)
                     {
+                        size_t removed = 0;
+                        UTILS::UI::show_progress(_data.hal, "Favorites", 0, std::format("Removing {} / {}", removed, total));
                         size_t cnt = _data.hal->nodedb()->getNodeCount();
                         for (size_t i = 0; i < cnt; i++)
                         {
                             Mesh::NodeInfo ni;
                             if (_data.hal->nodedb()->getNodeByIndex(i, ni) && ni.info.is_favorite)
+                            {
                                 _data.hal->nodedb()->setFavorite(ni.info.num, false);
+                                removed++;
+                                int progress = (int)((removed * 100) / total);
+                                UTILS::UI::show_progress(_data.hal,
+                                                         "Favorites",
+                                                         progress,
+                                                         std::format("Removing {} / {}", removed, total));
+                                _data.hal->updateMesh();
+                            }
                         }
                     }
                     _data.fav_selected_index = 0;
@@ -3244,6 +3282,32 @@ void AppNodes::_handle_ignore_list_input()
             _data.view_state = ViewState::NODE_LIST;
             _data.update_list = true;
         }
+        else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_ENTER))
+        {
+            // For found nodes only: switch to node list and focus on selected
+            if (_data.ign_total_count > 0)
+            {
+                std::vector<uint32_t> sel;
+                Mesh::ignorelist_load_range((size_t)_data.ign_selected_index, 1, sel);
+                if (!sel.empty())
+                {
+                    uint32_t node_id = sel[0];
+                    auto* nodedb = _data.hal->nodedb();
+                    if (nodedb)
+                    {
+                        Mesh::NodeInfo ni;
+                        if (nodedb->getNode(node_id, ni))
+                        {
+                            _data.hal->playNextSound();
+                            _data.hal->keyboard()->waitForRelease(KEY_NUM_ENTER);
+                            _data.list_selected_node_id = node_id;
+                            _data.view_state = ViewState::NODE_LIST;
+                            _data.update_list = true;
+                        }
+                    }
+                }
+            }
+        }
         else if (_data.hal->keyboard()->isKeyPressing(KEY_NUM_BACKSPACE))
         {
             _data.hal->playNextSound();
@@ -3254,7 +3318,30 @@ void AppNodes::_handle_ignore_list_input()
                 // Clear all ignored
                 if (UTILS::UI::show_confirmation_dialog(_data.hal, "Ignore list", "Clear ignore list?", "Clear", "Cancel"))
                 {
+                    size_t total = Mesh::ignorelist_get_count();
                     Mesh::ignorelist_clear();
+                    // Also clear is_ignored flag on all nodes
+                    if (_data.hal->nodedb() && total > 0)
+                    {
+                        size_t removed = 0;
+                        UTILS::UI::show_progress(_data.hal, "Ignore list", 0, std::format("Removing {} / {}", removed, total));
+                        size_t cnt = _data.hal->nodedb()->getNodeCount();
+                        for (size_t i = 0; i < cnt; i++)
+                        {
+                            Mesh::NodeInfo ni;
+                            if (_data.hal->nodedb()->getNodeByIndex(i, ni) && ni.info.is_ignored)
+                            {
+                                _data.hal->nodedb()->setIgnored(ni.info.num, false);
+                                removed++;
+                                int progress = (int)((removed * 100) / total);
+                                UTILS::UI::show_progress(_data.hal,
+                                                         "Ignore list",
+                                                         progress,
+                                                         std::format("Removing {} / {}", removed, total));
+                                _data.hal->updateMesh();
+                            }
+                        }
+                    }
                     _data.ign_selected_index = 0;
                     _data.ign_scroll_offset = 0;
                 }
@@ -3273,6 +3360,9 @@ void AppNodes::_handle_ignore_list_input()
                         if (UTILS::UI::show_confirmation_dialog(_data.hal, title, "Remove from ignored?", "Delete", "Cancel"))
                         {
                             Mesh::ignorelist_remove_at((size_t)_data.ign_selected_index);
+                            auto* nodedb = _data.hal->nodedb();
+                            if (nodedb)
+                                nodedb->setIgnored(node_id, false);
                             _data.ign_total_count = Mesh::ignorelist_get_count();
                             if (_data.ign_selected_index >= (int)_data.ign_total_count && _data.ign_selected_index > 0)
                                 _data.ign_selected_index--;
