@@ -11,6 +11,7 @@
 #include "lwip/dns.h"
 #include "lwip/ip4_addr.h"
 #include <cstdlib>
+#include <algorithm>
 
 static const char* TAG = "WIFI";
 

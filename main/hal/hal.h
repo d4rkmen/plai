@@ -11,7 +11,9 @@
 #pragma once
 #include "hal_config.h"
 #include "board.h"
+#if HAL_USE_DISPLAY
 #include "LovyanGFX.h"
+#endif
 #include "settings/settings.h"
 #include <iostream>
 #include <string>

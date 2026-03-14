@@ -1,11 +1,11 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <functional>
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "mooncake.h"
 #include "settings/settings.h"
 
 namespace HAL

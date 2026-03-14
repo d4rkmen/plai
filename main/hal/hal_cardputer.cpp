@@ -10,7 +10,6 @@
  */
 #include "hal_cardputer.h"
 #include "hal_config.h"
-#include <mooncake.h>
 #include "common_define.h"
 #if HAL_USE_DISPLAY
 #include "display/display.hpp"
