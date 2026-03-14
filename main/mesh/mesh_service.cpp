@@ -448,7 +448,7 @@ namespace Mesh
 
     MeshService::MeshService(HAL::Hal* hal)
         : _my_region(nullptr), _bw(250.0f), _sf(11), _cr(5), _saved_freq(0.0f), _saved_channel_num(0), _radio(nullptr),
-          _gps(nullptr), _nodedb(nullptr), _router(), _config(), _state(MeshState::UNINITIALIZED), _message_callback(nullptr),
+          _gps(nullptr), _gps_queue(nullptr), _nodedb(nullptr), _router(), _config(), _state(MeshState::UNINITIALIZED), _message_callback(nullptr),
           _connection_callback(nullptr), _battery_callback(nullptr), _fromradio_state(FromRadioState::IDLE),
           _fromradio_config_id(0), _fromradio_node_index(0), _fromradio_channel_index(0), _last_nodeinfo_broadcast_ms(0),
           _force_nodeinfo_broadcast(false), _last_position_broadcast_ms(0), _last_telemetry_broadcast_ms(0),
@@ -457,12 +457,18 @@ namespace Mesh
     {
         _hal = hal;
         memset(&_config, 0, sizeof(_config));
+        _gps_queue = xQueueCreate(1, sizeof(HAL::GpsData));
         _instance = this;
     }
 
     MeshService::~MeshService()
     {
         stop();
+        if (_gps_queue)
+        {
+            vQueueDelete(_gps_queue);
+            _gps_queue = nullptr;
+        }
         _instance = nullptr;
     }
 
@@ -597,6 +603,13 @@ namespace Mesh
         }
 
         uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+        // Process deferred GPS data (posted from the GPS background task)
+        HAL::GpsData gps_snapshot;
+        if (_gps_queue && xQueueReceive(_gps_queue, &gps_snapshot, 0) == pdTRUE)
+        {
+            _onGpsData(gps_snapshot);
+        }
 
         // Process radio events
         if (_radio)
@@ -1108,19 +1121,22 @@ namespace Mesh
             _gps->setDataCallback(nullptr);
         }
         _gps = gps;
-        if (_gps)
+        if (_gps && _gps_queue)
         {
-            _gps->setDataCallback([this](const HAL::GpsData& data) { _onGpsData(data); });
+            _gps->setDataCallback([this](const HAL::GpsData& data) {
+                xQueueOverwrite(_gps_queue, &data);
+            });
         }
     }
 
     void MeshService::_onGpsData(const HAL::GpsData& data)
     {
+        // blonk yellow led
+        _hal->led()->blink_once(HAL::Color(255, 255, 0), 200);
         if ((time_t)data.time <= BUILD_TIMESTAMP)
         {
             return;
-        }
-
+        }        
         time_t sys_now = 0;
         time(&sys_now);
         time_t drift = (time_t)data.time - sys_now;
@@ -1136,7 +1152,7 @@ namespace Mesh
                 _hal->playNotificationSound(HAL::Hal::NotificationSound::GPS);
                 _hal->setGPSAdjusted(true);
             }
-            ESP_LOGI(TAG, "System time adjusted from GPS: %lu (drift: %llds)", (unsigned long)data.time, (long long)drift);
+            ESP_LOGI(TAG, "System time adjusted from GPS: %lu (drift: %lds)", (unsigned long)data.time, (long)drift);
         }
     }
 
@@ -2142,8 +2158,11 @@ namespace Mesh
                     pb_istream_t s = pb_istream_from_buffer(pb, ps);
                     if (pb_decode(&s, meshtastic_Position_fields, &pos) && pos.has_latitude_i && pos.has_longitude_i)
                     {
-                        int w = snprintf(le.payload_desc, sizeof(le.payload_desc), "%.7f, %.7f",
-                                         pos.latitude_i * 1e-7, pos.longitude_i * 1e-7);
+                        int w = snprintf(le.payload_desc,
+                                         sizeof(le.payload_desc),
+                                         "%.7f, %.7f",
+                                         pos.latitude_i * 1e-7,
+                                         pos.longitude_i * 1e-7);
                         if (pos.has_altitude && w > 0 && w < (int)sizeof(le.payload_desc) - 1)
                             snprintf(le.payload_desc + w, sizeof(le.payload_desc) - w, ", %dm", (int)pos.altitude);
                     }
@@ -2154,8 +2173,12 @@ namespace Mesh
                     meshtastic_User user = meshtastic_User_init_default;
                     pb_istream_t s = pb_istream_from_buffer(pb, ps);
                     if (pb_decode(&s, meshtastic_User_fields, &user))
-                        snprintf(le.payload_desc, sizeof(le.payload_desc), "%s (%s) [%s]",
-                                 user.long_name, user.short_name, NodeDB::getRoleName(user.role));
+                        snprintf(le.payload_desc,
+                                 sizeof(le.payload_desc),
+                                 "%s (%s) [%s]",
+                                 user.long_name,
+                                 user.short_name,
+                                 NodeDB::getRoleName(user.role));
                     break;
                 }
                 case meshtastic_PortNum_ROUTING_APP:
@@ -2172,7 +2195,11 @@ namespace Mesh
                         }
                         else
                         {
-                            static const struct { uint8_t code; const char* name; } errs[] = {
+                            static const struct
+                            {
+                                uint8_t code;
+                                const char* name;
+                            } errs[] = {
                                 {meshtastic_Routing_Error_NO_ROUTE, "NO_ROUTE"},
                                 {meshtastic_Routing_Error_GOT_NAK, "GOT_NAK"},
                                 {meshtastic_Routing_Error_TIMEOUT, "TIMEOUT"},
@@ -2189,7 +2216,11 @@ namespace Mesh
                             };
                             const char* name = nullptr;
                             for (const auto& e : errs)
-                                if (e.code == err) { name = e.name; break; }
+                                if (e.code == err)
+                                {
+                                    name = e.name;
+                                    break;
+                                }
                             if (name)
                                 snprintf(le.payload_desc, sizeof(le.payload_desc), "%s (0x%02x)", name, err);
                             else
@@ -2206,16 +2237,22 @@ namespace Mesh
                         tel.which_variant == meshtastic_Telemetry_device_metrics_tag)
                     {
                         const auto& dm = tel.variant.device_metrics;
-                        snprintf(le.payload_desc, sizeof(le.payload_desc), "%u%%, %.2fV",
-                                 (unsigned)dm.battery_level, dm.voltage);
+                        snprintf(le.payload_desc,
+                                 sizeof(le.payload_desc),
+                                 "%u%%, %.2fV",
+                                 (unsigned)dm.battery_level,
+                                 dm.voltage);
                     }
                     break;
                 }
                 case meshtastic_PortNum_TRACEROUTE_APP:
                 {
                     int hops = (packet.hop_start > 0) ? (packet.hop_start - packet.hop_limit) : 0;
-                    snprintf(le.payload_desc, sizeof(le.payload_desc), "%s, %d hops",
-                             decoded_packet.decoded.want_response ? "Request" : "Response", hops);
+                    snprintf(le.payload_desc,
+                             sizeof(le.payload_desc),
+                             "%s, %d hops",
+                             decoded_packet.decoded.want_response ? "Request" : "Response",
+                             hops);
                     break;
                 }
                 default:

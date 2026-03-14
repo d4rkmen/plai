@@ -17,6 +17,8 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include "hal/hal.h"
 #include "hal/radio/radio_interface.h"
 #include "hal/ble/ble_peripheral.h"
@@ -413,6 +415,7 @@ namespace Mesh
         // Member variables
         HAL::RadioInterface* _radio;
         HAL::GPS* _gps;
+        QueueHandle_t _gps_queue;
         NodeDB* _nodedb;
         PacketRouter _router;
         MeshConfig _config;
