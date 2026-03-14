@@ -440,23 +440,32 @@ namespace HAL
         trans.length = len * 8;
         trans.tx_buffer = tx;
         trans.rx_buffer = rx;
-        // acquire spi bus lock for 5 seconds
+
         if (xSemaphoreTake(_spi_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
         {
             ESP_LOGE(TAG, "Failed to take SPI mutex");
             return false;
         }
 
+        esp_err_t ret = spi_device_acquire_bus(_spi_handle, portMAX_DELAY);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to acquire SPI bus: %s", esp_err_to_name(ret));
+            xSemaphoreGive(_spi_mutex);
+            return false;
+        }
+
         setCS(true);
         waitBusy(100);
 
-        esp_err_t ret = spi_device_polling_transmit(_spi_handle, &trans);
+        ret = spi_device_polling_transmit(_spi_handle, &trans);
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "SPI transfer failed: %s", esp_err_to_name(ret));
         }
 
         setCS(false);
+        spi_device_release_bus(_spi_handle);
         xSemaphoreGive(_spi_mutex);
         return ret == ESP_OK;
     }
