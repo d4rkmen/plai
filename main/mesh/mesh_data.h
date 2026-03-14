@@ -310,6 +310,11 @@ namespace Mesh
         uint32_t getDMMessageCount(uint32_t node_id) const;
 
         /**
+         * @brief Check if a DM conversation has any messages (in-memory index lookup, no file I/O)
+         */
+        bool hasDMMessages(uint32_t node_id) const;
+
+        /**
          * @brief Load a single message by index from a DM conversation file
          * @param node_id  The conversation node ID
          * @param index    0-based message index (0 = oldest)

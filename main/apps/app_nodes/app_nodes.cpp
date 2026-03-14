@@ -777,12 +777,12 @@ bool AppNodes::_render_node_list()
             relay_node_id = nodedb->findNodeByRelayByte(node.relay_node);
             if (relay_node_id != 0)
             {
-                Mesh::NodeInfo relay_info;
-                // using nodedb (not mesh wrapper) because no our node in the list
-                if (nodedb->getNode(relay_node_id, relay_info))
+                const auto* relay_idx = nodedb->getNodeIndex(relay_node_id);
+                if (relay_idx)
                 {
                     have_relay_node = true;
-                    short_name = Mesh::NodeDB::getLabel(relay_info);
+                    short_name = relay_idx->short_name[0] ? relay_idx->short_name
+                                                          : std::format("{:04x}", relay_node_id & 0xFFFF);
                 }
             }
         }
@@ -872,7 +872,7 @@ bool AppNodes::_render_node_list()
             canvas->drawRightString(ticker_str, panel_x + panel_width - 1 - SCROLL_BAR_WIDTH - 6, y_offset + 1);
         }
         // if node has messages, draw a message icon
-        else if (store.getDMMessageCount(node.info.num) > 0)
+        else if (store.hasDMMessages(node.info.num))
         {
             canvas->pushImage(panel_x + panel_width - 1 - SCROLL_BAR_WIDTH - LIST_ITEM_HEIGHT,
                               y_offset + 2,

@@ -448,12 +448,13 @@ namespace Mesh
 
     MeshService::MeshService(HAL::Hal* hal)
         : _my_region(nullptr), _bw(250.0f), _sf(11), _cr(5), _saved_freq(0.0f), _saved_channel_num(0), _radio(nullptr),
-          _gps(nullptr), _gps_queue(nullptr), _nodedb(nullptr), _router(), _config(), _state(MeshState::UNINITIALIZED), _message_callback(nullptr),
-          _connection_callback(nullptr), _battery_callback(nullptr), _fromradio_state(FromRadioState::IDLE),
-          _fromradio_config_id(0), _fromradio_node_index(0), _fromradio_channel_index(0), _last_nodeinfo_broadcast_ms(0),
-          _force_nodeinfo_broadcast(false), _last_position_broadcast_ms(0), _last_telemetry_broadcast_ms(0),
-          _tx_in_progress(false), _last_tx_start_ms(0), _last_rx_rssi(0), _last_rx_snr(0.0f), _airtime_window_start_ms(0),
-          _airtime_tx_ms(0), _airtime_rx_ms(0), _airtime_tx_ms_prev(0), _airtime_rx_ms_prev(0)
+          _gps(nullptr), _gps_queue(nullptr), _nodedb(nullptr), _router(), _config(), _state(MeshState::UNINITIALIZED),
+          _message_callback(nullptr), _connection_callback(nullptr), _battery_callback(nullptr),
+          _fromradio_state(FromRadioState::IDLE), _fromradio_config_id(0), _fromradio_node_index(0),
+          _fromradio_channel_index(0), _last_nodeinfo_broadcast_ms(0), _force_nodeinfo_broadcast(false),
+          _last_position_broadcast_ms(0), _last_telemetry_broadcast_ms(0), _tx_in_progress(false), _last_tx_start_ms(0),
+          _last_rx_rssi(0), _last_rx_snr(0.0f), _airtime_window_start_ms(0), _airtime_tx_ms(0), _airtime_rx_ms(0),
+          _airtime_tx_ms_prev(0), _airtime_rx_ms_prev(0)
     {
         _hal = hal;
         memset(&_config, 0, sizeof(_config));
@@ -1123,9 +1124,7 @@ namespace Mesh
         _gps = gps;
         if (_gps && _gps_queue)
         {
-            _gps->setDataCallback([this](const HAL::GpsData& data) {
-                xQueueOverwrite(_gps_queue, &data);
-            });
+            _gps->setDataCallback([this](const HAL::GpsData& data) { xQueueOverwrite(_gps_queue, &data); });
         }
     }
 
@@ -1136,7 +1135,7 @@ namespace Mesh
         if ((time_t)data.time <= BUILD_TIMESTAMP)
         {
             return;
-        }        
+        }
         time_t sys_now = 0;
         time(&sys_now);
         time_t drift = (time_t)data.time - sys_now;
@@ -1152,7 +1151,19 @@ namespace Mesh
                 _hal->playNotificationSound(HAL::Hal::NotificationSound::GPS);
                 _hal->setGPSAdjusted(true);
             }
-            ESP_LOGI(TAG, "System time adjusted from GPS: %lu (drift: %lds)", (unsigned long)data.time, (long)drift);
+            // dump new system date abd time dd.MM.yyyy HH:mm:ss
+            struct tm timeinfo;
+            localtime_r(&tv.tv_sec, &timeinfo);
+            ESP_LOGI(TAG,
+                     "System time adjusted from GPS: %lu (drift: %lds) = %02d.%02d.%04d %02d:%02d:%02d",
+                     (unsigned long)data.time,
+                     (long)drift,
+                     timeinfo.tm_mday,
+                     timeinfo.tm_mon + 1,
+                     timeinfo.tm_year + 1900,
+                     timeinfo.tm_hour,
+                     timeinfo.tm_min,
+                     timeinfo.tm_sec);
         }
     }
 

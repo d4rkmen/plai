@@ -464,6 +464,12 @@ namespace Mesh
         return count;
     }
 
+    bool MeshDataStore::hasDMMessages(uint32_t node_id) const
+    {
+        const MessageIndexEntry* entry = findIndexEntry(node_id, true);
+        return entry && entry->message_count > 0;
+    }
+
     bool MeshDataStore::getDMMessageByIndex(uint32_t node_id, uint32_t index, TextMessage& out) const
     {
         std::string path = getDMFilePath(node_id);
