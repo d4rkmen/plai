@@ -656,7 +656,7 @@ namespace Mesh
                     _last_tx_start_ms = now;
 #if HAL_USE_LED
                     if (_hal->led())
-                        _hal->led()->blink_once({255, 200, 0}, 50);
+                        _hal->led()->blink_once({0, 255, 0}, 50);
 #endif
                     // Log TX packet
                     if (qp.raw_len >= sizeof(PacketHeader))
@@ -1131,7 +1131,7 @@ namespace Mesh
     void MeshService::_onGpsData(const HAL::GpsData& data)
     {
         // blonk yellow led
-        _hal->led()->blink_once(HAL::Color(255, 255, 0), 200);
+        _hal->led()->blink_once(HAL::Color(255, 255, 0), 100);
         if ((time_t)data.time <= BUILD_TIMESTAMP)
         {
             return;
