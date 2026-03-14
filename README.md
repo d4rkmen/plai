@@ -31,7 +31,15 @@ Full node management with up to 1000 nodes persisted on SD card.
 
 <p align="center">
   <img src="pics/nodes.png" width="480" alt="Node Detail">
+</p>
+<p align="center">
   <img src="pics/nodes_list.png" width="480" alt="Node List">
+</p>
+<p align="center">
+  <img src="pics/nodes_favorites.png" width="480" alt="Node Favorites List">
+</p>
+<p align="center">
+  <img src="pics/nodes_ignored.png" width="480" alt="Node Ignored List">
 </p>
 
 - Node list with signal strength, hops, battery, role, encryption indicators
@@ -49,6 +57,8 @@ Full node management with up to 1000 nodes persisted on SD card.
 
 <p align="center">
   <img src="pics/nodes_dm.png" width="480" alt="Direct Messages">
+</p>
+<p align="center">
   <img src="pics/input.png" width="480" alt="Message Input">
 </p>
 
@@ -63,6 +73,8 @@ Full node management with up to 1000 nodes persisted on SD card.
 
 <p align="center">
   <img src="pics/nodes_tr_log.png" width="480" alt="Traceroute Log">
+</p>
+<p align="center">
   <img src="pics/nodes_tr_details.png" width="480" alt="Traceroute Details">
 </p>
 
@@ -97,7 +109,15 @@ Multi-channel group chat supporting up to 8 channels.
 
 <p align="center">
   <img src="pics/channels.png" width="480" alt="Channel Chat">
+</p>
+<p align="center">
   <img src="pics/channels_list.png" width="480" alt="Channel List">
+</p>
+<p align="center">
+  <img src="pics/channels_edit.png" width="480" alt="Channel Edit">
+</p>
+<p align="center">
+  <img src="pics/channels_chat.png" width="480" alt="Channel Chat">
 </p>
 <p align="center">
   <img src="pics/channel_chat_info.png" width="480" alt="Channel Chat Info">
@@ -136,7 +156,15 @@ Live radio packet feed for debugging and network analysis.
 
 <p align="center">
   <img src="pics/monitor.png" width="480" alt="Packet Detail">
+</p>
+<p align="center">
   <img src="pics/monitor_list.png" width="480" alt="Packet List">
+</p>
+<p align="center">
+  <img src="pics/monitor_header.png" width="480" alt="Packet Header">
+</p>
+<p align="center">
+  <img src="pics/monitor_payload.png" width="480" alt="Packet Payload">
 </p>
 
 - Real-time TX/RX packet display with port labels (TEXT, POS, NODE, TELE, ROUT, TRAC, etc.)
