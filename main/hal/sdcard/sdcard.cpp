@@ -17,6 +17,8 @@
 #include "driver/sdspi_host.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "sdcard.h"
 
 #define PIN_NUM_MISO 39
@@ -53,9 +55,10 @@ bool SDCard::mount(bool format_if_mount_failed)
         ESP_LOGE(TAG, "Failed to initialize SPI bus: %s", esp_err_to_name(ret));
         return false;
     }
-    if (ret == ESP_ERR_INVALID_STATE)
+    _bus_shared = (ret == ESP_ERR_INVALID_STATE);
+    if (_bus_shared)
     {
-        ESP_LOGD(TAG, "SPI bus already initialized (likely by radio or display), slot=%d", host.slot);
+        ESP_LOGD(TAG, "SPI bus already initialized (shared with radio), slot=%d", host.slot);
     }
     else
     {
@@ -72,19 +75,35 @@ bool SDCard::mount(bool format_if_mount_failed)
                                                      .disk_status_check_enable = false,
                                                      .use_one_fat = false};
 
-    ret = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &card);
-    if (ret != ESP_OK)
+    static constexpr int MAX_MOUNT_RETRIES = 3;
+    static constexpr int RETRY_DELAY_MS = 200;
+
+    for (int attempt = 0; attempt < MAX_MOUNT_RETRIES; attempt++)
     {
+        if (attempt > 0)
+        {
+            ESP_LOGW(TAG, "Retrying SD card mount (attempt %d/%d)...", attempt + 1, MAX_MOUNT_RETRIES);
+            vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
+        }
+
+        ret = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &card);
+        if (ret == ESP_OK)
+        {
+            sdmmc_card_print_info(stdout, card);
+            _is_mounted = true;
+            return true;
+        }
+
         card = nullptr;
+        ESP_LOGE(TAG, "Mount attempt %d failed: %s (0x%x)", attempt + 1, esp_err_to_name(ret), ret);
+    }
+
+    if (!_bus_shared)
+    {
         spi_bus_free((spi_host_device_t)host.slot);
-        ESP_LOGE(TAG, "Failed to mount filesystem");
-        return false;
-    };
-
-    sdmmc_card_print_info(stdout, card);
-    _is_mounted = true;
-
-    return true;
+    }
+    ESP_LOGE(TAG, "Failed to mount filesystem after %d attempts", MAX_MOUNT_RETRIES);
+    return false;
 }
 
 bool SDCard::eject()
@@ -101,7 +120,10 @@ bool SDCard::eject()
         return false;
     }
     card = nullptr;
-    spi_bus_free((spi_host_device_t)host.slot);
+    if (!_bus_shared)
+    {
+        spi_bus_free((spi_host_device_t)host.slot);
+    }
     _is_mounted = false;
 
     return true;

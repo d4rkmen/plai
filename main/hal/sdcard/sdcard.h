@@ -32,6 +32,7 @@ private:
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     sdmmc_card_t* card = nullptr;
     bool _is_mounted = false;
+    bool _bus_shared = false;
 };
 
 #endif // SD_CARD_MANAGER_H
