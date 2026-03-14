@@ -2400,7 +2400,7 @@ namespace Mesh
                                             for (uint8_t i = 0; i < 8; i++)
                                             {
                                                 auto* ch = _nodedb->getChannel(i);
-                                                if (!ch)
+                                                if (!ch || ch->role == meshtastic_Channel_Role_DISABLED)
                                                 {
                                                     free_slot = i;
                                                     break;
