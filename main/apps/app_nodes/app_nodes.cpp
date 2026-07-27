@@ -2435,15 +2435,15 @@ void AppNodes::_handle_dm_input()
             auto* nodedb = _data.hal->nodedb();
             std::vector<std::string> channel_labels;
             std::vector<uint8_t> channel_indices;
-            if (nodedb)
+            if (nodedb && _data.hal->mesh())
             {
                 for (uint8_t i = 0; i < 8; i++)
                 {
                     auto* ch = nodedb->getChannel(i);
-                    if (!ch || ch->role == meshtastic_Channel_Role_DISABLED || !ch->has_settings ||
-                        ch->settings.name[0] == '\0')
+                    if (!ch || ch->role == meshtastic_Channel_Role_DISABLED)
                         continue;
-                    channel_labels.push_back(std::format("[{}] {}", (int)i, ch->settings.name));
+                    channel_labels.push_back(
+                        std::format("[{}] {}", (int)i, Mesh::resolveChannelName(ch->settings, _data.hal->mesh()->getConfig())));
                     channel_indices.push_back(i);
                 }
             }
@@ -2469,7 +2469,10 @@ void AppNodes::_handle_dm_input()
                                               &b64_len,
                                               ch->settings.psk.bytes,
                                               ch->settings.psk.size);
-                        std::string invite = std::format("#invite {}={}", ch->settings.name, psk_b64);
+                        // Blank names go out under the resolved default name so the peer can match it
+                        std::string invite = std::format("#invite {}={}",
+                                                         Mesh::resolveChannelName(ch->settings, _data.hal->mesh()->getConfig()),
+                                                         psk_b64);
 
                         bool has_pubkey =
                             _data.selected_node.info.has_user && _data.selected_node.info.user.public_key.size == 32;

@@ -104,12 +104,23 @@ static constexpr size_t PREDEF_PING_REPLY_COUNT = sizeof(PREDEF_PING_REPLY) / si
 #define CHAT_FOOTER_HEIGHT 9
 #define CHAT_ITEM_HEIGHT 12
 
-static void _draw_channel_header(LGFX_Sprite* canvas,
+// A blank name marks the default channel, which is known on the mesh by the modem preset name
+static const char* _channel_name(HAL::Hal* hal, const meshtastic_Channel& ch)
+{
+    if (ch.settings.name[0] != '\0')
+        return ch.settings.name;
+    if (hal && hal->mesh())
+        return Mesh::resolveChannelName(ch.settings, hal->mesh()->getConfig());
+    return "Default";
+}
+
+static void _draw_channel_header(HAL::Hal* hal,
                                  const meshtastic_Channel& ch,
                                  const char* title,
                                  const uint16_t* right_icon,
                                  const char* right_text = nullptr)
 {
+    auto* canvas = hal->canvas();
     const int y = 0;
     bool is_primary = (ch.role == meshtastic_Channel_Role_PRIMARY);
     uint32_t ch_color = is_primary ? TFT_ORANGE : TFT_CYAN;
@@ -132,7 +143,7 @@ static void _draw_channel_header(LGFX_Sprite* canvas,
     name_x += 14;
 
     canvas->setTextColor(title ? TFT_ORANGE : THEME_COLOR_UNSELECTED);
-    canvas->drawString(title ? title : ch.settings.name, name_x, y + 1);
+    canvas->drawString(title ? title : _channel_name(hal, ch), name_x, y + 1);
 
     if (right_icon)
         canvas->pushImage(canvas->width() - 1 - 12, y, 12, 12, right_icon, TFT_WHITE);
@@ -310,28 +321,14 @@ void AppChannels::_refresh_channels()
     auto* nodedb = _data.hal->nodedb();
     auto& store = Mesh::MeshDataStore::getInstance();
 
+    // A blank name is valid (it marks the default channel)
     for (uint8_t i = 0; i < 8; i++)
     {
         auto* ch = nodedb->getChannel(i);
-        if (ch && ch->has_settings && ch->settings.name[0] != '\0')
+        if (ch && ch->role != meshtastic_Channel_Role_DISABLED)
         {
             _data.channels.push_back({*ch, store.getUnreadChannelCount(i)});
         }
-    }
-
-    if (_data.channels.empty())
-    {
-        meshtastic_Channel def = meshtastic_Channel_init_default;
-        def.index = 0;
-        def.has_settings = true;
-        def.role = meshtastic_Channel_Role_PRIMARY;
-        strncpy(def.settings.name,
-                _data.hal->mesh()->getConfig().lora_config.use_preset
-                    ? Mesh::getPresetName(_data.hal->mesh()->getConfig().lora_config.modem_preset)
-                    : "Custom",
-                sizeof(def.settings.name) - 1);
-        // strncpy(def.settings.name, "Default", sizeof(def.settings.name) - 1);
-        _data.channels.push_back({def, store.getUnreadChannelCount(0)});
     }
 
     _data.update_list = true;
@@ -477,7 +474,11 @@ static const std::vector<EditItem> EDIT_ITEMS = {
      "Something for end users to call the channel. If this is the empty string it is assumed that this channel is the special "
      "(minimally secure) \"Default\" channel.",
      TFT_CYAN,
-     [](AppChannels*, const meshtastic_Channel& ch) { return std::string(ch.settings.name); },
+     [](AppChannels* app, const meshtastic_Channel& ch)
+     {
+         // Show the derived default channel name in angle brackets while the name is blank
+         return ch.settings.name[0] ? std::string(ch.settings.name) : std::format("<{}>", _channel_name(app->get_hal(), ch));
+     },
      [](AppChannels* app, meshtastic_Channel& ch)
      {
          std::string name(ch.settings.name);
@@ -771,11 +772,31 @@ void AppChannels::_save_channel_edit()
     auto& channel = _data.edit_channel;
     uint8_t channel_index = _data.edit_channel_index;
 
-    if (channel.settings.name[0] == '\0')
+    // Channels are addressed on air by a single hash byte of name + key, so two enabled
+    // channels sharing one hash are indistinguishable to the receiver
+    if (channel.role != meshtastic_Channel_Role_DISABLED && _data.hal->mesh())
     {
-        UTILS::UI::show_error_dialog(_data.hal, "Error", "Channel name is required");
-        _data.update_list = true;
-        return;
+        uint8_t hash = _data.hal->mesh()->getChannelHash(channel.settings);
+        for (uint8_t i = 0; i < 8; i++)
+        {
+            if (i == channel_index)
+                continue;
+            auto* other = _data.hal->nodedb()->getChannel(i);
+            if (!other || other->role == meshtastic_Channel_Role_DISABLED)
+                continue;
+            if (_data.hal->mesh()->getChannelHash(other->settings) != hash)
+                continue;
+
+            UTILS::UI::show_error_dialog(_data.hal,
+                                         "Error",
+                                         std::format("Same hash #{:02X} as channel {} ({}). Change name or key",
+                                                     hash,
+                                                     (int)i,
+                                                     _channel_name(_data.hal, *other))
+                                             .c_str());
+            _data.update_list = true;
+            return;
+        }
     }
 
     _data.hal->nodedb()->setChannel(channel_index, channel);
@@ -815,6 +836,13 @@ void AppChannels::_save_channel_edit()
             auto* ch = _data.hal->nodedb()->getChannel(0);
             if (ch)
             {
+                if (ch->role == meshtastic_Channel_Role_DISABLED || !ch->has_settings)
+                {
+                    *ch = meshtastic_Channel_init_default;
+                    ch->has_settings = true;
+                    ch->settings.channel_num = 1; // Default notification sound
+                    psk_from_key_type("Default", ch->settings.psk);
+                }
                 ch->role = meshtastic_Channel_Role_PRIMARY;
                 _data.hal->nodedb()->setChannel(0, *ch);
             }
@@ -907,15 +935,16 @@ bool AppChannels::_render_channel_list()
         name_x += 14;
 
         // Channel name
+        const char* ch_name = _channel_name(_data.hal, mc);
         canvas->setTextColor(is_selected ? THEME_COLOR_SELECTED : THEME_COLOR_UNSELECTED);
-        canvas->drawString(mc.settings.name, name_x, y_offset + 1);
+        canvas->drawString(ch_name, name_x, y_offset + 1);
 
         // Channel hash
         if (_data.hal->mesh())
         {
             uint8_t ch_hash = _data.hal->mesh()->getChannelHash(mc.settings);
             canvas->setTextColor(is_selected ? THEME_COLOR_SELECTED : THEME_COLOR_CHANNEL_HASH);
-            int name_width = canvas->textWidth(mc.settings.name);
+            int name_width = canvas->textWidth(ch_name);
             canvas->drawString(std::format("#{:02X}", ch_hash).c_str(), name_x + name_width + 4, y_offset + 1);
         }
 
@@ -968,7 +997,7 @@ bool AppChannels::_render_channel_chat()
     canvas->setFont(FONT_12);
 
     const auto& mc = _data.channels[_data.selected_index].channel;
-    _draw_channel_header(canvas,
+    _draw_channel_header(_data.hal,
                          mc,
                          nullptr,
                          (const uint16_t*)image_data_chat,
@@ -1173,8 +1202,8 @@ bool AppChannels::_render_channel_edit()
     canvas->fillScreen(THEME_COLOR_BG);
     canvas->setFont(FONT_12);
 
-    const char* title = _data.edit_is_new ? "New channel" : ch.settings.name;
-    _draw_channel_header(canvas, ch, title, (const uint16_t*)image_data_edit);
+    const char* title = _data.edit_is_new ? "New channel" : _channel_name(_data.hal, ch);
+    _draw_channel_header(_data.hal, ch, title, (const uint16_t*)image_data_edit);
 
     int y = HEADER_H;
     int max_width = canvas->width() - 4;
@@ -1363,7 +1392,7 @@ void AppChannels::_handle_channel_list_input()
                 else
                 {
                     _data.selected_channel = _data.channels[_data.selected_index].channel.index;
-                    _data.selected_channel_name = _data.channels[_data.selected_index].channel.settings.name;
+                    _data.selected_channel_name = _channel_name(_data.hal, _data.channels[_data.selected_index].channel);
                     _data.chat_cur_line = 0;
                     _refresh_messages();
                     // Auto-scroll to bottom
@@ -1417,7 +1446,7 @@ void AppChannels::_handle_channel_list_input()
                     UTILS::UI::show_error_dialog(_data.hal, "Error", "Cannot delete primary channel");
                 }
                 else if (UTILS::UI::show_confirmation_dialog(_data.hal,
-                                                             sel.channel.settings.name,
+                                                             _channel_name(_data.hal, sel.channel),
                                                              "Delete channel and all messages?",
                                                              "Delete",
                                                              "Cancel"))

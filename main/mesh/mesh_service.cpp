@@ -318,16 +318,7 @@ namespace Mesh
 
         const char* getChannelNameForHash(const Mesh::MeshConfig& config)
         {
-            const char* channelName = config.primary_channel.settings.name;
-            if (channelName[0] == '\0')
-            {
-                if (config.lora_config.use_preset)
-                {
-                    return getPresetDisplayName(config.lora_config.modem_preset);
-                }
-                return "Custom";
-            }
-            return channelName;
+            return resolveChannelName(config.primary_channel.settings, config);
         }
 
         bool expandChannelPsk(const meshtastic_ChannelSettings& settings, uint8_t* key, size_t& key_len, bool& no_crypto)
@@ -391,11 +382,7 @@ namespace Mesh
                                             size_t key_len,
                                             uint8_t& out_hash)
         {
-            const char* channelName = settings.name;
-            if (channelName[0] == '\0')
-            {
-                channelName = getChannelNameForHash(config);
-            }
+            const char* channelName = resolveChannelName(settings, config);
             uint8_t nameHash = xorHash(reinterpret_cast<const uint8_t*>(channelName), strlen(channelName));
             uint8_t keyHash = key_len == 0 ? 0 : xorHash(key, key_len);
             out_hash = nameHash ^ keyHash;
@@ -426,6 +413,19 @@ namespace Mesh
             return false;
         }
     } // namespace
+
+    const char* resolveChannelName(const meshtastic_ChannelSettings& settings, const MeshConfig& config)
+    {
+        if (settings.name[0] != '\0')
+        {
+            return settings.name;
+        }
+        if (config.lora_config.use_preset)
+        {
+            return getPresetName(config.lora_config.modem_preset);
+        }
+        return "Custom";
+    }
 
     // Static instance for callbacks
     MeshService* MeshService::_instance = nullptr;
@@ -2237,7 +2237,7 @@ namespace Mesh
                                             auto* ch = _nodedb->getChannel(i);
                                             if (!ch || ch->role == meshtastic_Channel_Role_DISABLED)
                                                 continue;
-                                            if (strncmp(ch->settings.name, ch_name.c_str(), sizeof(ch->settings.name)) == 0 &&
+                                            if (strcmp(resolveChannelName(ch->settings, _config), ch_name.c_str()) == 0 &&
                                                 ch->settings.psk.size == key_len &&
                                                 memcmp(ch->settings.psk.bytes, key_buf, key_len) == 0)
                                             {

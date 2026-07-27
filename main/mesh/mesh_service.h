@@ -171,6 +171,19 @@ namespace Mesh
         bool telemetry_air_util;
         bool telemetry_uptime;
     };
+
+    /**
+     * @brief Resolve the effective name of a channel
+     *
+     * An empty channel name marks the special "Default" channel, which the mesh
+     * identifies by the current modem preset name (e.g. "LongFast").
+     *
+     * @param settings Channel settings
+     * @param config Mesh configuration (supplies the modem preset)
+     * @return Name to use for hashing and display, never empty
+     */
+    const char* resolveChannelName(const meshtastic_ChannelSettings& settings, const MeshConfig& config);
+
     /**
      * @brief Main mesh protocol service
      */
