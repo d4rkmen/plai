@@ -991,12 +991,11 @@ namespace UTILS
         int
         show_select_dialog(HAL::Hal* hal, const std::string& title, const std::vector<std::string>& items, int default_index)
         {
-            constexpr size_t MAX_DIALOG_ITEMS = 32;
-            const char* ptrs[MAX_DIALOG_ITEMS];
-            size_t count = std::min(items.size(), MAX_DIALOG_ITEMS);
-            for (size_t i = 0; i < count; i++)
-                ptrs[i] = items[i].c_str();
-            return show_select_dialog(hal, title, ptrs, count, default_index);
+            std::vector<const char*> ptrs;
+            ptrs.reserve(items.size());
+            for (const auto& item : items)
+                ptrs.push_back(item.c_str());
+            return show_select_dialog(hal, title, ptrs.data(), ptrs.size(), default_index);
         }
 
         int show_select_dialog(
